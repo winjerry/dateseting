@@ -1,0 +1,113 @@
+### Product Requirements Document (PRD)  
+**Product Name:** Datesetepetmatch  
+**Purpose:** To facilitate the creation, management, and operation of dating events with automatic matchmaking and participant management, enhancing user experience for both event organizers and participants.
+
+---
+
+### 1. Overview  
+Datesetepetmatch is an event management tool designed to help organizers create dating events, manage participants, and facilitate matchmaking via a seamless web-based platform. It enables participants to register via QR codes or links, build profiles, and receive match results based on mutual interest.
+
+---
+
+### 2. Key Features and Requirements
+
+#### 2.1 User Account and Authentication  
+- Users must log in or create a free account to access event creation and management features.  
+- Authentication should be simple and secure.
+
+#### 2.2 Event Creation  
+- Organizer can create two types of events:  
+  - Standard event (up to 100 participants)  
+  - Large event (up to 200 participants)  
+- Event details include:  
+  - Event name  
+  - Date and time  
+  - Location  
+  - Short description  
+- Ability to edit event details anytime after creation.  
+- Ability to increase event capacity dynamically in increments of 100 or 200 participants.  
+- Payment processing integrated via Stripe before finalizing event creation.
+
+#### 2.3 Event Management Dashboard  
+- Display event details prominently upon login.  
+- “Manage Participants” tab to:  
+  - View participant list (including names, emails, photos)  
+  - Track matches as they occur  
+- “Manage Capacity” tab to adjust participant limits.  
+- “Support” tab with contact info (email authenticdating224@gmail.com) for assistance.  
+- Export participant data (names, emails) for organizer’s own use.  
+- Share event via QR code and event link for participant registration.
+
+#### 2.4 Participant Registration Flow  
+- Participants access event by scanning QR code or clicking shared link.  
+- Fill out a short profile including:  
+  - Name  
+  - Age  
+  - Interests (e.g., pizza, golf)  
+  - Email  
+  - Phone number  
+- Upload a selfie for their profile.  
+- Optionally download a “dating questions guide” containing icebreakers and deeper conversation questions.  
+- Submit the profile to register for the event.
+
+#### 2.5 Event Operation  
+- Organizers display QR code/link visibly at the event entrance (screen or printed).  
+- Participants scan and register as a form of “ticket” to enter.  
+- Participants mingle and interact during the event.
+
+#### 2.6 Post-Event Process  
+- Organizer sends a “post-event email” to all participants containing:  
+  - List of attendees (first names and photos only)  
+- Participants select people they are interested in connecting with.  
+- Organizer uses the system to compute matches based on mutual interest.  
+- Organizer sends “match results” email only to mutual matches, containing:  
+  - Full names  
+  - Email and phone number if provided  
+- Recommended to complete these steps before event attendees leave to maximize engagement.
+
+---
+
+### 3. Interaction Flow
+
+1. **Event Creation**  
+   - User logs in or signs up.  
+   - Select event type (standard/large).  
+   - Fill in event details.  
+   - Proceed to payment via Stripe.  
+   - Redirected to Event Manager Dashboard.
+
+2. **Event Sharing**  
+   - Organizer accesses “Share Event” card.  
+   - Copies QR code or event link.  
+   - Displays QR code/link at event for participant registration.
+
+3. **Participant Registration**  
+   - Participant scans QR code or clicks link.  
+   - Completes profile form (name, age, interests, email, phone).  
+   - Takes/upload a selfie.  
+   - Optionally downloads icebreaker guide.  
+   - Submits registration.
+
+4. **During Event**  
+   - Organizer monitors participant list and matches via dashboard.  
+   - Participants socialize and interact.
+
+5. **Post-Event Communication**  
+   - Organizer sends post-event email with attendee info.  
+   - Participants select interests.  
+   - System identifies mutual matches.  
+   - Organizer sends match results email to matched participants.
+
+---
+
+### 4. Additional Notes  
+- Data privacy: Participants’ personal data is managed securely and only shared with mutual matches.  
+- Export function allows organizers to manage participant data externally.  
+- Support contact is provided for troubleshooting and assistance.
+
+---
+
+### Summary  
+Datesetepetmatch efficiently streamlines dating event workflows from creation to matchmaking, leveraging QR codes and automated email communications. The system empowers organizers with flexible event management tools and provides participants a smooth registration and matching experience, fostering meaningful connections.
+
+---
