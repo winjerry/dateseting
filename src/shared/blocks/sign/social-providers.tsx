@@ -53,6 +53,12 @@ export function SocialProviders({
           setLoading(false);
           setIsShowSignModal(false);
         },
+        fetchOptions: {
+          onSuccess: () => {
+            router.push(callbackUrl || '/');
+            setIsShowSignModal(false);
+          },
+        },
         onSuccess: (ctx) => {},
         onError: (e: any) => {
           toast.error(e?.error?.message || 'sign in failed');

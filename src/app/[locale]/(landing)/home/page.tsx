@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/core/i18n/navigation';
 import { Heart, MapPin, Users, Sparkles, ArrowRight, CheckCircle, Calendar, MessageCircle, Star, Shield, Clock, Zap } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Badge } from '@/shared/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/avatar';
+import { useAppContext } from '@/shared/contexts/app';
 
 // 模拟即将到来的活动
 const UPCOMING_EVENTS = [
@@ -42,6 +44,7 @@ const UPCOMING_EVENTS = [
 export default function HomePage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
+  const { user } = useAppContext();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
@@ -58,12 +61,29 @@ export default function HomePage() {
               </span>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => router.push('/sign-in')}>
-                Log in
-              </Button>
-              <Button onClick={() => router.push('/sign-up')} className="rounded-full px-6">
-                Sign up
-              </Button>
+              {user ? (
+                <>
+                  <Button variant="outline" className="rounded-full" onClick={() => router.push('/my-events')}>
+                    My Events
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Avatar>
+                      <AvatarImage src={user.image || ''} alt={user.name || ''} />
+                      <AvatarFallback>{(user.name || user.email || 'U').charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium">{user.name || user.email}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Button variant="ghost" onClick={() => router.push('/sign-in')}>
+                    Log in
+                  </Button>
+                  <Button onClick={() => router.push('/sign-up')} className="rounded-full px-6">
+                    Sign up
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
