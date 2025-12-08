@@ -34,5 +34,5 @@ export default async function SignInPage({
 
   const configs = await getConfigs();
 
-  return <SignIn configs={configs} callbackUrl={callbackUrl || '/'} />;
+  return <SignIn configs={configs} callbackUrl={callbackUrl || '/my-events'} />;
 }

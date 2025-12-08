@@ -2,17 +2,12 @@
 
 import { ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Heart, CalendarPlus, LayoutDashboard, Settings, LogOut, User } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Heart, CalendarPlus, LayoutDashboard, LogOut } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Avatar, AvatarFallback } from '@/shared/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/shared/components/ui/dropdown-menu';
+import { useAppContext } from '@/shared/contexts/app';
+import { signOut } from '@/core/auth/client';
 
 interface OrganizerLayoutProps {
   children: ReactNode;
@@ -20,6 +15,17 @@ interface OrganizerLayoutProps {
 
 export function OrganizerLayout({ children }: OrganizerLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user } = useAppContext();
+
+  const handleSignOut = () =>
+    signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          router.push('/');
+        },
+      },
+    });
 
   const navItems = [
     { href: '/my-events', label: 'Dashboard', icon: LayoutDashboard },
@@ -63,34 +69,26 @@ export function OrganizerLayout({ children }: OrganizerLayoutProps) {
               ))}
             </nav>
 
-            {/* User Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="gap-2 px-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                      ORG
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="hidden sm:inline text-sm">Organizer</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem>
-                  <User className="h-4 w-4 mr-2" />
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                  {(user?.name || user?.email || 'U').slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span className="hidden sm:inline text-sm">
+                {user?.name || user?.email || 'User'}
+              </span>
+            </div>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-2 gap-2"
+              onClick={handleSignOut}
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </Button>
           </div>
         </div>
       </header>
