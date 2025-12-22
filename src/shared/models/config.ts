@@ -1,4 +1,4 @@
-import { revalidateTag, unstable_cache } from 'next/cache';
+// Server-only cache implemented locally to avoid importing next/cache in client bundles
 
 import { db } from '@/core/db';
 import { envConfigs } from '@/config';
@@ -12,6 +12,15 @@ export type UpdateConfig = Partial<Omit<NewConfig, 'name'>>;
 export type Configs = Record<string, string>;
 
 export const CACHE_TAG_CONFIGS = 'configs';
+
+let configsCache: Configs | null = null;
+let configsCacheTime = 0;
+const CACHE_TTL_MS = 3600 * 1000;
+
+function invalidateConfigsCache() {
+  configsCache = null;
+  configsCacheTime = 0;
+}
 
 export async function saveConfigs(configs: Record<string, string>) {
   const result = await db().transaction(async (tx) => {
@@ -34,43 +43,47 @@ export async function saveConfigs(configs: Record<string, string>) {
     return results;
   });
 
-  revalidateTag(CACHE_TAG_CONFIGS, 'max');
+  invalidateConfigsCache();
 
   return result;
 }
 
 export async function addConfig(newConfig: NewConfig) {
   const [result] = await db().insert(config).values(newConfig).returning();
-  revalidateTag(CACHE_TAG_CONFIGS, 'max');
+  invalidateConfigsCache();
 
   return result;
 }
 
-export const getConfigs = unstable_cache(
-  async (): Promise<Configs> => {
-    const configs: Record<string, string> = {};
-
-    if (!envConfigs.database_url) {
-      return configs;
-    }
-
-    const result = await db().select().from(config);
-    if (!result) {
-      return configs;
-    }
-
-    for (const config of result) {
-      configs[config.name] = config.value ?? '';
-    }
-
-    return configs;
-  },
-  ['configs'],
-  {
-    revalidate: 3600,
-    tags: [CACHE_TAG_CONFIGS],
+export async function getConfigs(): Promise<Configs> {
+  const now = Date.now();
+  if (configsCache && now - configsCacheTime < CACHE_TTL_MS) {
+    return configsCache;
   }
-);
+
+  const configs: Record<string, string> = {};
+
+  if (!envConfigs.database_url) {
+    configsCache = configs;
+    configsCacheTime = now;
+    return configs;
+  }
+
+  const result = await db().select().from(config);
+  if (!result) {
+    configsCache = configs;
+    configsCacheTime = now;
+    return configs;
+  }
+
+  for (const cfg of result) {
+    configs[cfg.name] = cfg.value ?? '';
+  }
+
+  configsCache = configs;
+  configsCacheTime = now;
+  return configs;
+}
 
 export async function getAllConfigs(): Promise<Configs> {
   let dbConfigs: Configs = {};

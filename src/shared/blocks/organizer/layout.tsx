@@ -1,13 +1,22 @@
 'use client';
 
 import { ReactNode } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { Heart, CalendarPlus, LayoutDashboard, LogOut } from 'lucide-react';
+import { Link, useRouter } from '@/core/i18n/navigation';
+import { usePathname } from 'next/navigation';
+import { Heart, CalendarPlus, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Avatar, AvatarFallback } from '@/shared/components/ui/avatar';
 import { useAppContext } from '@/shared/contexts/app';
 import { signOut } from '@/core/auth/client';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/shared/components/ui/dropdown-menu';
+import { LogOut } from 'lucide-react';
 
 interface OrganizerLayoutProps {
   children: ReactNode;
@@ -18,18 +27,19 @@ export function OrganizerLayout({ children }: OrganizerLayoutProps) {
   const router = useRouter();
   const { user } = useAppContext();
 
-  const handleSignOut = () =>
-    signOut({
+  const handleSignOut = async () => {
+    await signOut({
       fetchOptions: {
         onSuccess: () => {
           router.push('/');
         },
       },
     });
+    router.push('/');
+  };
 
-  const navItems = [
-    { href: '/my-events', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/my-events/create', label: 'Create Event', icon: CalendarPlus },
+  const navItems: { href: string; label: string; icon: any }[] = [
+    { href: '/my-events', label: 'My Events', icon: LayoutDashboard },
   ];
 
   const isActive = (href: string) => {
@@ -69,26 +79,41 @@ export function OrganizerLayout({ children }: OrganizerLayoutProps) {
               ))}
             </nav>
 
-            <div className="flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                  {(user?.name || user?.email || 'U').slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden sm:inline text-sm">
-                {user?.name || user?.email || 'User'}
-              </span>
-            </div>
+            <div className="flex items-center gap-4">
+                <Link href="/my-events/create">
+                  <Button size="sm" className="gap-2">
+                    <CalendarPlus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Create Event</span>
+                  </Button>
+                </Link>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-2 gap-2"
-              onClick={handleSignOut}
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full ml-auto">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                          {(user?.name || user?.email || 'u').charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{user?.name || user?.email || 'User'}</p>
+                        {user?.email && (
+                          <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                        )}
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Sign out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
           </div>
         </div>
       </header>

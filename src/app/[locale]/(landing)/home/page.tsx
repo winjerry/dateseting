@@ -2,49 +2,43 @@
 
 import { useState } from 'react';
 import { useRouter } from '@/core/i18n/navigation';
-import { Heart, MapPin, Users, Sparkles, ArrowRight, CheckCircle, Calendar, MessageCircle, Star, Shield, Clock, Zap } from 'lucide-react';
+import { Heart, Users, Sparkles, ArrowRight, CheckCircle, Calendar, MessageCircle, Star, Shield, Clock, Zap } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Badge } from '@/shared/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/avatar';
 import { useAppContext } from '@/shared/contexts/app';
+import { LocaleSelector, ThemeToggler } from '@/shared/blocks/common';
+import { signOut } from '@/core/auth/client';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/shared/components/ui/dropdown-menu';
+import { User, LayoutDashboard, LogOut } from 'lucide-react';
+import { Link } from '@/core/i18n/navigation';
 
-// 模拟即将到来的活动
-const UPCOMING_EVENTS = [
-  {
-    id: '1',
-    name: 'Downtown Singles Mixer',
-    date: 'Dec 20, 2024',
-    time: '7:00 PM',
-    location: 'San Francisco, CA',
-    spotsLeft: 55,
-    image: '🌃',
-  },
-  {
-    id: '2',
-    name: 'Tech Industry Meet & Greet',
-    date: 'Dec 28, 2024',
-    time: '6:30 PM',
-    location: 'Palo Alto, CA',
-    spotsLeft: 32,
-    image: '💻',
-  },
-  {
-    id: '3',
-    name: 'New Year Romance Night',
-    date: 'Jan 5, 2025',
-    time: '8:00 PM',
-    location: 'Los Angeles, CA',
-    spotsLeft: 78,
-    image: '🎉',
-  },
-];
+
 
 export default function HomePage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const { user } = useAppContext();
+
+  const handleSignOut = async () => {
+    await signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          router.push('/');
+        },
+      },
+    });
+    router.push('/');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
@@ -61,28 +55,51 @@ export default function HomePage() {
               </span>
             </div>
             <div className="flex items-center gap-3">
+              <ThemeToggler />
+              <LocaleSelector type="button" />
               {user ? (
                 <>
-                  <Button variant="outline" className="rounded-full" onClick={() => router.push('/my-events')}>
-                    My Events
-                  </Button>
-                  <div className="flex items-center gap-2">
-                    <Avatar>
-                      <AvatarImage src={user.image || ''} alt={user.name || ''} />
-                      <AvatarFallback>{(user.name || user.email || 'U').charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-medium">{user.name || user.email}</span>
-                  </div>
+                  <Link href="/my-events">
+                    <Button variant="ghost" className="gap-2">
+                       <LayoutDashboard className="h-4 w-4" />
+                       <span className="hidden sm:inline">My Events</span>
+                    </Button>
+                  </Link>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={user.image || ''} alt={user.name || ''} />
+                          <AvatarFallback>{(user.name || user.email || 'U').charAt(0)}</AvatarFallback>
+                        </Avatar>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56" align="end" forceMount>
+                      <DropdownMenuLabel className="font-normal">
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm font-medium leading-none">{user.name}</p>
+                          <p className="text-xs leading-none text-muted-foreground">
+                            {user.email}
+                          </p>
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => router.push('/settings/profile')}>
+                         <User className="mr-2 h-4 w-4" />
+                         <span>Profile</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleSignOut}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Sign out</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>
               ) : (
-                <>
-                  <Button variant="ghost" onClick={() => router.push('/sign-in')}>
-                    Log in
-                  </Button>
-                  <Button onClick={() => router.push('/sign-up')} className="rounded-full px-6">
-                    Sign up
-                  </Button>
-                </>
+                <Button variant="ghost" onClick={() => router.push('/sign-in')}>
+                  Log in
+                </Button>
               )}
             </div>
           </div>
@@ -247,50 +264,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Upcoming Events Section */}
-      <section className="py-20 bg-gradient-to-r from-primary/5 to-accent/5">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-12">
-            <div>
-              <Badge variant="outline" className="mb-4">Events</Badge>
-              <h2 className="text-3xl md:text-4xl font-bold">Upcoming Events</h2>
-            </div>
-            <Button variant="outline" className="rounded-full gap-2">
-              View All Events
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-6">
-            {UPCOMING_EVENTS.map((event) => (
-              <Card key={event.id} className="overflow-hidden hover:shadow-xl transition-all cursor-pointer group">
-                <div className="h-32 bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-6xl group-hover:scale-105 transition-transform">
-                  {event.image}
-                </div>
-                <CardContent className="p-5">
-                  <h3 className="font-semibold text-lg mb-2">{event.name}</h3>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-primary" />
-                      {event.date} at {event.time}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-primary" />
-                      {event.location}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                    <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                      {event.spotsLeft} spots left
-                    </Badge>
-                    <Button size="sm" className="rounded-full">Book Now</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* Testimonials Section */}
       <section className="py-20">
@@ -342,7 +316,7 @@ export default function HomePage() {
             <Button size="lg" variant="secondary" className="rounded-full px-8 h-14 text-lg">
               Browse Events
             </Button>
-            <Button size="lg" variant="outline" className="rounded-full px-8 h-14 text-lg border-white text-white hover:bg-white/10">
+            <Button size="lg" variant="default" className="rounded-full px-8 h-14 text-lg">
               Host Your Own Event
             </Button>
           </div>

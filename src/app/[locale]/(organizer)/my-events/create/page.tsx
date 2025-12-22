@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CalendarPlus, Loader2, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 
 export default function CreateEventPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -23,30 +24,39 @@ export default function CreateEventPage() {
     eventType: 'standard',
   });
 
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (!id) return;
+    const fetchEvent = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`/api/events/${id}`);
+        const data = await res.json();
+        if (res.ok && data.event) {
+          const e = data.event;
+          setFormData({
+            name: e.name || '',
+            description: e.description || '',
+            location: e.location || '',
+            eventDate: e.eventDate ? new Date(e.eventDate).toISOString().slice(0, 10) : '',
+            eventTime: e.eventTime || '19:00',
+            eventType: e.eventType || 'standard',
+          });
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEvent();
+  }, [searchParams]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const res = await fetch('/api/events/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to create event');
-      }
-
-      toast.success('Event created successfully!');
-      // Navigate to the newly created event's detail page
-      if (data.event?.id) {
-        router.push(`/my-events/${data.event.id}`);
-      } else {
-        router.push('/my-events');
-      }
+      sessionStorage.setItem('event_draft', JSON.stringify(formData));
+      router.push('/my-events/create/confirm');
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || 'Something went wrong');
