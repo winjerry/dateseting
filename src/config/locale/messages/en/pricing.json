@@ -327,6 +327,20 @@
       }
     ]
   },
+  "plans": {
+    "free": {
+      "title": "DateSet Free",
+      "description": "For individual developers and small projects"
+    },
+    "pro": {
+      "title": "DateSet Pro",
+      "description": "For startups and commercial projects"
+    },
+    "enterprise": {
+      "title": "DateSet Enterprise",
+      "description": "For large enterprises and custom needs"
+    }
+  },
   "page": {
     "current_plan": "Current Plan",
     "processing": "Processing"

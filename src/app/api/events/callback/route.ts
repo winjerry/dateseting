@@ -4,7 +4,13 @@ import { envConfigs } from '@/config';
 import { findOrderByOrderNo } from '@/shared/models/order';
 import { getUserInfo } from '@/shared/models/user';
 import { getPaymentService, handleCheckoutSuccess } from '@/shared/services/payment';
-import { createEvent, EventStatus } from '@/shared/models/event';
+import {
+  createEvent,
+  EventStatus,
+  EVENT_CAPACITIES,
+  EventType,
+  findEventByOrderId,
+} from '@/shared/models/event';
 
 export async function GET(req: Request) {
   let redirectUrl = '';
@@ -47,28 +53,40 @@ export async function GET(req: Request) {
 
     await handleCheckoutSuccess({ order, session });
 
-    // create event from order description (stored draft)
-    try {
-      const draft = JSON.parse(order.description || '{}');
-      if (draft && draft.name && draft.location && draft.eventDate && draft.eventTime && draft.eventType) {
-        await createEvent({
-          organizerId: user.id,
-          name: draft.name,
-          description: draft.description,
-          location: draft.location,
-          eventDate: new Date(draft.eventDate),
-          eventTime: draft.eventTime,
-          eventType: draft.eventType,
-          capacity: 0,
-          price: order.amount || 0,
-          status: EventStatus.PAID,
-        });
-      }
-    } catch (e) {
-      console.log('create event from draft failed:', e);
-    }
+    const existingEvent = await findEventByOrderId(order.id);
+    if (existingEvent) {
+      redirectUrl = `${envConfigs.app_url}/my-events/${existingEvent.id}`;
+    } else {
+      // create event from order description (stored draft)
+      try {
+        const draft = JSON.parse(order.description || '{}');
+        if (draft && draft.name && draft.location && draft.eventDate && draft.eventTime && draft.eventType) {
+          const createdEvent = await createEvent({
+            organizerId: user.id,
+            name: draft.name,
+            description: draft.description,
+            location: draft.location,
+            eventDate: new Date(draft.eventDate),
+            eventTime: draft.eventTime,
+            eventEndTime: draft.eventEndTime,
+            eventType: draft.eventType,
+            capacity: EVENT_CAPACITIES[draft.eventType as EventType] || 100,
+            price: order.amount || 0,
+            status: EventStatus.PAID,
+            isPaid: true,
+            orderId: order.id,
+            shareLink: '',
+          });
 
-    redirectUrl = `${envConfigs.app_url}/my-events`;
+          redirectUrl = `${envConfigs.app_url}/my-events/${createdEvent.id}`;
+        } else {
+          redirectUrl = `${envConfigs.app_url}/my-events`;
+        }
+      } catch (e) {
+        console.log('create event from draft failed:', e);
+        throw e;
+      }
+    }
   } catch (e: any) {
     console.log('events callback failed:', e);
     redirectUrl = `${envConfigs.app_url}/my-events/create`;

@@ -1,29 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/core/auth/session';
 import { findEventById, updateEventById } from '@/shared/models/event';
-import { 
-  getParticipantsByEventId, 
-  getParticipantMatches, 
-  ParticipantStatus 
+import {
+  findParticipantById,
+  getMatchResults,
+  getParticipantsByEventId,
+  markMatchesAsNotified,
 } from '@/shared/models/participant';
-import { getEmailService } from '@/shared/services/email';
-
-type RouteParams = { params: Promise<{ eventId: string }> };
+import { getAllConfigs } from '@/shared/models/config';
+import { Resend } from 'resend';
 
 export async function POST(
   request: NextRequest,
-  { params }: RouteParams
+  props: { params: Promise<{ eventId: string }> }
 ) {
   try {
-    const { eventId } = await params;
     const session = await getServerSession();
-    
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { action } = body;
+    const params = await props.params;
+    const { eventId } = params;
+    const { action } = await request.json(); // 'send-participant-list' | 'send-match-results'
 
     const event = await findEventById(eventId);
     if (!event) {
@@ -34,132 +33,148 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Initialize Email Service
-    let emailService;
-    try {
-        emailService = await getEmailService();
-    } catch (e) {
-        console.warn("Failed to init email service, maybe DB is not connected. Proceeding with mock success.");
-        // Mock success if email service fails (e.g. no DB)
-        return NextResponse.json({
-            success: true,
-            message: `Mock email sent for action: ${action}`,
-            details: 'Email service not available'
-        });
+    // Get configs from database
+    const configs = await getAllConfigs();
+    const apiKey = configs['resend_api_key'];
+    const senderEmail = configs['resend_sender_email'] || 'Speed Dating <onboarding@resend.dev>';
+
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Email service not configured (Missing Resend API Key in Settings)' }, { status: 500 });
     }
 
+    // Initialize Resend with key from DB
+    const resend = new Resend(apiKey);
+
+    let stats = { total: 0, success: 0, failed: 0 };
+
     if (action === 'send-participant-list') {
-      // 1. Get all participants
-      const participants = await getParticipantsByEventId(eventId, { 
-        status: ParticipantStatus.REGISTERED 
-      });
+      const participants = await getParticipantsByEventId(eventId);
+      stats.total = participants.length;
 
-      if (participants.length === 0) {
-        return NextResponse.json({ error: 'No participants found' }, { status: 400 });
-      }
+      const results = await Promise.allSettled(
+        participants.map(p => 
+          resend.emails.send({
+            from: senderEmail,
+            to: p.email,
+            subject: `Participant List: ${event.name}`,
+            html: `
+              <h2>Participant List for ${event.name}</h2>
+              <p>Here are the people you will meet today:</p>
+              <div style="display:grid;gap:12px;">
+                ${participants
+                  .map((item) => {
+                    const firstName = item.name.split(' ')[0];
+                    const photo = item.photoUrl
+                      ? `<img src="${item.photoUrl}" alt="${firstName}" width="72" height="72" style="width:72px;height:72px;border-radius:9999px;object-fit:cover;" />`
+                      : `<div style="width:72px;height:72px;border-radius:9999px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-weight:700;">${firstName.charAt(0)}</div>`;
 
-      // 2. Generate HTML List
-      const participantListHtml = participants.map(p => `
-        <div style="border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 5px;">
-           ${p.photoUrl ? `<img src="${p.photoUrl}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; margin-right: 10px;" />` : ''}
-           <strong>${p.name}</strong> (${p.age}) - ${p.interests || 'No interests listed'}
-        </div>
-      `).join('');
-
-      const emailContent = `
-        <h1>Meeting Participants</h1>
-        <p>Here is the list of participants for ${event.name}:</p>
-        ${participantListHtml}
-        <p>Good luck!</p>
-      `;
-
-      // 3. Send to all participants
-      // In a real scenario, use a batch sending service or loop carefully.
-      // For demo, we just log and simulate sending to one mock address or loop.
-      
-      console.log(`Sending participant list to ${participants.length} recipients...`);
-      
-      const sendPromises = participants.map(p => 
-        emailService.sendEmail({
-          to: p.email,
-          subject: `Participant List for ${event.name}`,
-          html: emailContent,
-        })
+                    return `
+                      <div style="display:flex;align-items:center;gap:12px;">
+                        ${photo}
+                        <div>
+                          <div style="font-weight:600;">${firstName}</div>
+                        </div>
+                      </div>
+                    `;
+                  })
+                  .join('')}
+              </div>
+            `,
+          })
+        )
       );
 
-      await Promise.allSettled(sendPromises);
+      stats.success = results.filter(r => r.status === 'fulfilled' && !r.value.error).length;
+      stats.failed = stats.total - stats.success;
 
-      // 4. Update Event Status
-      await updateEventById(eventId, {
-        postEventEmailSentAt: new Date()
-      });
-
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Participant list sent successfully',
-        count: participants.length
-      });
+      if (stats.failed === 0 && stats.total > 0) {
+        await updateEventById(eventId, {
+          postEventEmailSentAt: new Date(),
+        });
+      }
 
     } else if (action === 'send-match-results') {
-      // 1. Get participants
-      const participants = await getParticipantsByEventId(eventId);
-      let matchNotificationCount = 0;
+      if (!event.isMatchingCompleted) {
+        return NextResponse.json(
+          { error: 'Calculate matches before sending results' },
+          { status: 400 }
+        );
+      }
 
-      // 2. Loop and find matches for each
-      const sendPromises = participants.map(async (p) => {
-        const matches = await getParticipantMatches(p.id);
+      const matches = await getMatchResults(eventId);
+      
+      // Group matches by participant to send one email per person
+      const userMatches = new Map<string, string[]>(); // participantId -> [targetIds]
+      
+      matches.forEach(m => {
+        if (!userMatches.has(m.participant1Id)) userMatches.set(m.participant1Id, []);
+        if (!userMatches.has(m.participant2Id)) userMatches.set(m.participant2Id, []);
         
-        if (matches.length > 0) {
-            matchNotificationCount++;
-            
-            const matchesHtml = matches.map(m => `
-                <div style="border: 1px solid #d4a5ff; background: #fdf5ff; padding: 15px; margin-bottom: 10px; border-radius: 8px;">
-                    <h3>It's a Match! ❤️</h3>
-                    ${m.photoUrl ? `<img src="${m.photoUrl}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; display: block; margin-bottom: 10px;" />` : ''}
-                    <p><strong>Name:</strong> ${m.name}</p>
-                    <p><strong>Email:</strong> <a href="mailto:${m.email}">${m.email}</a></p>
-                    ${m.phone ? `<p><strong>Phone:</strong> ${m.phone}</p>` : ''}
-                </div>
-            `).join('');
-
-            const emailContent = `
-                <h1>Your Match Results</h1>
-                <p>Hi ${p.name}, great news! You have matches from ${event.name}!</p>
-                ${matchesHtml}
-                <p>Don't be shy, reach out to them!</p>
-            `;
-
-            return emailService.sendEmail({
-                to: p.email,
-                subject: `You have new matches! - ${event.name}`,
-                html: emailContent,
-            });
-        }
-        return Promise.resolve();
+        userMatches.get(m.participant1Id)?.push(m.participant2Id);
+        userMatches.get(m.participant2Id)?.push(m.participant1Id);
       });
 
-      await Promise.allSettled(sendPromises);
+      stats.total = userMatches.size;
+      const promises: Promise<any>[] = [];
 
-      // 3. Update Event Status
-      await updateEventById(eventId, {
-        matchResultEmailSentAt: new Date()
-      });
+      for (const [userId, matchIds] of userMatches) {
+        promises.push((async () => {
+          const user = await findParticipantById(userId);
+          if (!user || !user.email) return { error: 'User not found' };
 
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Match results sent successfully',
-        count: matchNotificationCount
-      });
+          const matchedUsers = await Promise.all(
+            matchIds.map(id => findParticipantById(id))
+          );
+          
+          const validMatches = matchedUsers.filter(u => u !== undefined);
 
+          const matchesHtml = `
+            <h2>Congratulations! You have matches! 💕</h2>
+            <p>Here are your mutual matches from ${event.name}:</p>
+            <ul>
+              ${validMatches.map(m => `
+                <li>
+                  <strong>${m!.name}</strong><br/>
+                  Email: ${m!.email}<br/>
+                  ${m!.phone ? `Phone: ${m!.phone}` : ''}
+                </li>
+              `).join('')}
+            </ul>
+            <p>Reach out and say hello!</p>
+          `;
+
+          return resend.emails.send({
+            from: senderEmail,
+            to: user.email,
+            subject: `Your Matches from ${event.name}!`,
+            html: matchesHtml,
+          });
+        })());
+      }
+
+      const results = await Promise.allSettled(promises);
+      stats.success = results.filter(r => r.status === 'fulfilled' && !(r.value as any)?.error).length;
+      stats.failed = stats.total - stats.success;
+
+      if (stats.failed === 0 && stats.total > 0) {
+        await updateEventById(eventId, {
+          matchResultEmailSentAt: new Date(),
+        });
+        await markMatchesAsNotified(eventId);
+      }
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-  } catch (error) {
+    return NextResponse.json({
+      success: true,
+      message: `Processed ${stats.total} emails`,
+      stats
+    });
+  } catch (error: any) {
     console.error('Error sending emails:', error);
-    // Return success to avoid blocking UI in case of DB/Env errors in demo
     return NextResponse.json(
-      { error: 'Failed to send emails', details: String(error) },
+      { error: 'Failed to send emails' },
       { status: 500 }
     );
   }

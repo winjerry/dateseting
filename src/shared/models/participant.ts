@@ -41,10 +41,12 @@ export function generateChoiceToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+export type CreateParticipantInput = Omit<NewParticipant, 'id' | 'choiceToken' | 'choiceTokenExpiresAt' | 'createdAt' | 'updatedAt' | 'deletedAt'>;
+
 /**
  * 创建参与者
  */
-export async function createParticipant(newParticipant: NewParticipant): Promise<Participant> {
+export async function createParticipant(newParticipant: CreateParticipantInput): Promise<Participant> {
   const id = uuidv4();
   const choiceToken = generateChoiceToken();
   const choiceTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7天后过期
@@ -60,6 +62,78 @@ export async function createParticipant(newParticipant: NewParticipant): Promise
     .returning();
 
   return result;
+}
+
+export async function refreshParticipantChoiceToken(
+  participantId: string
+): Promise<Participant | undefined> {
+  const choiceToken = generateChoiceToken();
+  const choiceTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  const [result] = await db()
+    .update(participant)
+    .set({
+      choiceToken,
+      choiceTokenExpiresAt,
+    })
+    .where(eq(participant.id, participantId))
+    .returning();
+
+  return result;
+}
+
+export async function registerParticipantForEvent(
+  eventId: string,
+  newParticipant: CreateParticipantInput
+): Promise<Participant> {
+  return db().transaction(async (tx) => {
+    const [existingParticipant] = await tx
+      .select()
+      .from(participant)
+      .where(
+        and(
+          eq(participant.eventId, eventId),
+          eq(participant.email, newParticipant.email)
+        )
+      );
+
+    if (existingParticipant) {
+      throw new Error('EMAIL_ALREADY_REGISTERED');
+    }
+
+    const [capacityUpdate] = await tx
+      .update(event)
+      .set({
+        currentParticipants: sql`${event.currentParticipants} + 1`,
+      })
+      .where(
+        and(
+          eq(event.id, eventId),
+          sql`${event.currentParticipants} < ${event.capacity}`
+        )
+      )
+      .returning({ id: event.id });
+
+    if (!capacityUpdate) {
+      throw new Error('EVENT_FULL');
+    }
+
+    const id = uuidv4();
+    const choiceToken = generateChoiceToken();
+    const choiceTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const [createdParticipant] = await tx
+      .insert(participant)
+      .values({
+        ...newParticipant,
+        id,
+        choiceToken,
+        choiceTokenExpiresAt,
+      })
+      .returning();
+
+    return createdParticipant;
+  });
 }
 
 /**
@@ -125,6 +199,26 @@ export async function findParticipantByToken(token: string): Promise<Participant
     .select()
     .from(participant)
     .where(eq(participant.choiceToken, token));
+
+  return result;
+}
+
+/**
+ * 通过邮箱和活动ID查找参与者
+ */
+export async function findParticipantByEmailAndEventId(
+  eventId: string,
+  email: string
+): Promise<Participant | undefined> {
+  const [result] = await db()
+    .select()
+    .from(participant)
+    .where(
+      and(
+        eq(participant.eventId, eventId),
+        eq(participant.email, email)
+      )
+    );
 
   return result;
 }
@@ -246,12 +340,27 @@ export async function calculateMatches(eventId: string): Promise<MatchResult[]> 
   const matches: NewMatchResult[] = [];
   const processedPairs = new Set<string>();
 
+  // 获取现有的匹配结果，避免重复插入
+  const existingMatches = await db()
+    .select()
+    .from(matchResult)
+    .where(eq(matchResult.eventId, eventId));
+    
+  const existingPairs = new Set<string>();
+  for (const m of existingMatches) {
+    const pairKey = [m.participant1Id, m.participant2Id].sort().join('-');
+    existingPairs.add(pairKey);
+  }
+
   for (const [participantA, choicesA] of choiceMap) {
     for (const participantB of choicesA) {
-      // 检查是否已处理过这对
+      // 检查是否已处理过这对 (当前运行中)
       const pairKey = [participantA, participantB].sort().join('-');
       if (processedPairs.has(pairKey)) continue;
       processedPairs.add(pairKey);
+
+      // 检查是否已存在于数据库
+      if (existingPairs.has(pairKey)) continue;
 
       // 检查是否互相选择
       const choicesB = choiceMap.get(participantB);
@@ -268,7 +377,7 @@ export async function calculateMatches(eventId: string): Promise<MatchResult[]> 
     }
   }
 
-  // 保存匹配结果
+  // 保存新发现的匹配结果
   if (matches.length > 0) {
     await db().insert(matchResult).values(matches);
   }
@@ -298,6 +407,16 @@ export async function getMatchResults(eventId: string): Promise<MatchResult[]> {
   return db()
     .select()
     .from(matchResult)
+    .where(eq(matchResult.eventId, eventId));
+}
+
+export async function markMatchesAsNotified(eventId: string): Promise<void> {
+  await db()
+    .update(matchResult)
+    .set({
+      isNotified: true,
+      notifiedAt: new Date(),
+    })
     .where(eq(matchResult.eventId, eventId));
 }
 
@@ -335,12 +454,23 @@ export async function getMatchStats(eventId: string): Promise<{
   submittedChoices: number;
   totalMatches: number;
 }> {
-  const participants = await getParticipantsByEventId(eventId);
+  // 使用聚合查询获取提交数量，避免 limit 限制和性能问题
+  const [submittedResult] = await db()
+    .select({ count: count() })
+    .from(participant)
+    .where(
+      and(
+        eq(participant.eventId, eventId),
+        eq(participant.hasSubmittedChoices, true)
+      )
+    );
+
+  const totalParticipants = await getParticipantsCount(eventId);
   const matches = await getMatchResults(eventId);
 
   return {
-    totalParticipants: participants.length,
-    submittedChoices: participants.filter((p) => p.hasSubmittedChoices).length,
+    totalParticipants,
+    submittedChoices: submittedResult?.count || 0,
     totalMatches: matches.length,
   };
 }

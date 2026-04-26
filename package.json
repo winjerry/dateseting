@@ -137,6 +137,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@faker-js/faker": "^10.2.0",
     "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
     "@tailwindcss/postcss": "^4",
     "@types/markdown-it": "^14.1.2",

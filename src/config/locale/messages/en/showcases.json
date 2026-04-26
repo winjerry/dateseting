@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "title": "Showcases",
-    "description": "Awesome projects built with ShipAny"
+    "title": "DateSet Showcases",
+    "description": "See how other developers are building with DateSet"
   },
   "showcases": {
     "id": "showcase",
     "sr_only_title": "Showcases",
-    "title": "AI SaaS Startups built with ShipAny",
-    "description": "Easy to use and fast to ship.",
+    "title": "DateSet",
+    "description": "DateSet is a full-stack Next.js boilerplate with everything you need to build your SaaS product.",
     "items": [
       {
         "title": "ThinkAny",

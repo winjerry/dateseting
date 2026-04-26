@@ -1,16 +1,32 @@
 'use client';
 
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useRouter } from '@/core/i18n/navigation';
-import { Heart, Users, Sparkles, ArrowRight, CheckCircle, Calendar, MessageCircle, Star, Shield, Clock, Zap } from 'lucide-react';
+import {
+  ArrowRight,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Heart,
+  LayoutDashboard,
+  LogOut,
+  MessageCircle,
+  Shield,
+  Sparkles,
+  Star,
+  User,
+  Users,
+  Zap,
+} from 'lucide-react';
+
+import { signOut } from '@/core/auth/client';
+import { Link } from '@/core/i18n/navigation';
+import { LocaleSelector, ThemeToggler } from '@/shared/blocks/common';
+import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/avatar';
+import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
-import { Input } from '@/shared/components/ui/input';
-import { Badge } from '@/shared/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/avatar';
-import { useAppContext } from '@/shared/contexts/app';
-import { LocaleSelector, ThemeToggler } from '@/shared/blocks/common';
-import { signOut } from '@/core/auth/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,15 +35,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
-import { User, LayoutDashboard, LogOut } from 'lucide-react';
-import { Link } from '@/core/i18n/navigation';
-
-
+import { Input } from '@/shared/components/ui/input';
+import { useAppContext } from '@/shared/contexts/app';
+import { toast } from 'sonner';
 
 export default function HomePage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
   const { user } = useAppContext();
+  const [email, setEmail] = useState('');
+  const supportEmail =
+    process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@pairivo.com';
 
   const handleSignOut = async () => {
     await signOut({
@@ -40,151 +57,186 @@ export default function HomePage() {
     router.push('/');
   };
 
+  const handleHostEvent = () => {
+    if (user) {
+      router.push('/my-events/create');
+      return;
+    }
+    router.push('/sign-in');
+  };
+
+  const handleJoinWaitlist = (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+
+    const normalizedEmail = email.trim();
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+
+    if (!isValidEmail) {
+      toast.error('Please enter a valid email address.');
+      return;
+    }
+
+    const subject = encodeURIComponent('Pairivo Waitlist');
+    const body = encodeURIComponent(
+      `Please add me to the waitlist.\n\nEmail: ${normalizedEmail}`
+    );
+    toast.success('Opening your email app to join the waitlist.');
+    window.location.href = `mailto:${supportEmail}?subject=${subject}&body=${body}`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-                <Heart className="h-5 w-5 text-white fill-white" />
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Date, Set, Match
-              </span>
+      <nav className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-lg">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-lg">
+              <Heart className="h-5 w-5 fill-white text-white" />
             </div>
-            <div className="flex items-center gap-3">
-              <ThemeToggler />
-              <LocaleSelector type="button" />
-              {user ? (
-                <>
-                  <Link href="/my-events">
-                    <Button variant="ghost" className="gap-2">
-                       <LayoutDashboard className="h-4 w-4" />
-                       <span className="hidden sm:inline">My Events</span>
+            <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-xl font-bold text-transparent">
+              Pairivo
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <ThemeToggler />
+            <LocaleSelector type="button" />
+            {user ? (
+              <>
+                <Link href="/my-events">
+                  <Button variant="ghost" className="gap-2">
+                    <LayoutDashboard className="h-4 w-4" />
+                    <span className="hidden sm:inline">My Events</span>
+                  </Button>
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={user.image || ''} alt={user.name || ''} />
+                        <AvatarFallback>
+                          {(user.name || user.email || 'U').charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
                     </Button>
-                  </Link>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={user.image || ''} alt={user.name || ''} />
-                          <AvatarFallback>{(user.name || user.email || 'U').charAt(0)}</AvatarFallback>
-                        </Avatar>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56" align="end" forceMount>
-                      <DropdownMenuLabel className="font-normal">
-                        <div className="flex flex-col space-y-1">
-                          <p className="text-sm font-medium leading-none">{user.name}</p>
-                          <p className="text-xs leading-none text-muted-foreground">
-                            {user.email}
-                          </p>
-                        </div>
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => router.push('/settings/profile')}>
-                         <User className="mr-2 h-4 w-4" />
-                         <span>Profile</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleSignOut}>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Sign out</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              ) : (
-                <Button variant="ghost" onClick={() => router.push('/sign-in')}>
-                  Log in
-                </Button>
-              )}
-            </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm leading-none font-medium">
+                          {user.name}
+                        </p>
+                        <p className="text-muted-foreground text-xs leading-none">
+                          {user.email}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push('/settings/profile')}>
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Sign out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <Button variant="ghost" onClick={() => router.push('/sign-in')}>
+                Log in
+              </Button>
+            )}
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
       <section className="relative overflow-hidden py-20 lg:py-32">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-accent/10 opacity-50" />
-        
-        {/* Decorative elements */}
-        <div className="absolute top-20 left-10 w-20 h-20 bg-primary/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-32 h-32 bg-accent/20 rounded-full blur-3xl" />
-        
-        <div className="relative max-w-6xl mx-auto px-4">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left Content */}
-            <div className="space-y-8">
-              <Badge variant="outline" className="text-sm py-2 px-4 gap-2 bg-white/50 dark:bg-background/50 backdrop-blur">
-                <Sparkles className="h-4 w-4 text-primary" />
-                Real Connections, Real People
-              </Badge>
-              
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
-                Find Your 
-                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent"> Perfect Match </span>
-                with Speed Dating Events
-              </h1>
-              
-              <p className="text-lg text-muted-foreground max-w-xl">
-                Tired of endless swiping? Our events bring real people together for real connections. 
-                Meet like-minded singles in a fun, relaxed atmosphere.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" className="rounded-full px-8 h-14 text-lg gap-2 shadow-lg hover:shadow-xl transition-all">
-                  Find an Event Near You
-                  <ArrowRight className="h-5 w-5" />
-                </Button>
-                <Button size="lg" variant="outline" className="rounded-full px-8 h-14 text-lg">
-                  Host an Event
-                </Button>
-              </div>
+        <div className="absolute top-20 left-10 h-20 w-20 rounded-full bg-primary/20 blur-3xl" />
+        <div className="absolute right-10 bottom-20 h-32 w-32 rounded-full bg-accent/20 blur-3xl" />
 
-              {/* Trust badges */}
-              <div className="flex items-center gap-6 text-sm text-muted-foreground pt-4">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span>500+ Events</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span>10,000+ Matches</span>
-                </div>
-              </div>
+        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 lg:grid-cols-2">
+          <div className="space-y-8">
+            <Badge
+              variant="outline"
+              className="gap-2 bg-white/50 px-4 py-2 text-sm backdrop-blur dark:bg-background/50"
+            >
+              <Sparkles className="h-4 w-4 text-primary" />
+              Offline Dating Experience Platform
+            </Badge>
+
+            <h1 className="text-4xl leading-tight font-bold md:text-5xl lg:text-6xl">
+              Run Better
+              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                {' '}
+                Speed Dating Events{' '}
+              </span>
+              with Pairivo
+            </h1>
+
+            <p className="max-w-xl text-lg text-muted-foreground">
+              Pairivo helps organizers create events, manage participants, collect
+              choices, calculate matches, and send follow-up emails in one flow.
+            </p>
+
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <Button
+                size="lg"
+                className="h-14 gap-2 rounded-full px-8 text-lg shadow-lg transition-all hover:shadow-xl"
+                onClick={() => router.push('/faq')}
+              >
+                Participant Guide
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-14 rounded-full px-8 text-lg"
+                onClick={handleHostEvent}
+              >
+                Host an Event
+              </Button>
             </div>
 
-            {/* Right Illustration */}
-            <div className="relative hidden lg:block">
-              <div className="relative w-full aspect-square max-w-lg mx-auto">
-                {/* Main card */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-80 bg-gradient-to-br from-primary/90 to-accent/90 rounded-3xl shadow-2xl flex flex-col items-center justify-center text-white p-6">
-                  <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center mb-4">
-                    <Heart className="h-10 w-10" />
-                  </div>
-                  <h3 className="text-2xl font-bold">Find Love</h3>
-                  <p className="text-white/80 text-center mt-2">Connect with amazing people at our events</p>
+            <div className="flex items-center gap-6 pt-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                <span>Organizer Dashboard</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                <span>Automated Match Emails</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative hidden lg:block">
+            <div className="relative mx-auto aspect-square w-full max-w-lg">
+              <div className="absolute top-1/2 left-1/2 flex h-80 w-64 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-3xl bg-gradient-to-br from-primary/90 to-accent/90 p-6 text-white shadow-2xl">
+                <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/20">
+                  <Heart className="h-10 w-10" />
                 </div>
-                
-                {/* Floating cards */}
-                <div className="absolute top-0 right-0 bg-white dark:bg-card rounded-2xl shadow-lg p-4 flex items-center gap-3 animate-pulse">
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                  </div>
-                  <span className="font-medium">It&apos;s a Match!</span>
+                <h3 className="text-2xl font-bold">Run Events</h3>
+                <p className="mt-2 text-center text-white/80">
+                  Create, match, and notify participants in minutes
+                </p>
+              </div>
+
+              <div className="absolute top-0 right-0 flex items-center gap-3 rounded-2xl bg-white p-4 shadow-lg dark:bg-card">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
                 </div>
-                
-                <div className="absolute bottom-10 left-0 bg-white dark:bg-card rounded-2xl shadow-lg p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Users className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">45 people joined</p>
-                    <p className="text-xs text-muted-foreground">Downtown Mixer</p>
-                  </div>
+                <span className="font-medium">Matching Completed</span>
+              </div>
+
+              <div className="absolute bottom-10 left-0 flex items-center gap-3 rounded-2xl bg-white p-4 shadow-lg dark:bg-card">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Participants Registered</p>
+                  <p className="text-xs text-muted-foreground">Event dashboard live</p>
                 </div>
               </div>
             </div>
@@ -192,37 +244,62 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-20 bg-muted/30">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <Badge variant="outline" className="mb-4">Simple Process</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Simple steps to find your perfect match
+      <section className="bg-muted/30 py-20">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-16 text-center">
+            <Badge variant="outline" className="mb-4">
+              Simple Process
+            </Badge>
+            <h2 className="mb-4 text-3xl font-bold md:text-4xl">How It Works</h2>
+            <p className="mx-auto max-w-2xl text-muted-foreground">
+              Simple steps from registration to match delivery
             </p>
           </div>
-          
-          <div className="grid md:grid-cols-4 gap-8">
+
+          <div className="grid gap-8 md:grid-cols-4">
             {[
-              { icon: Calendar, title: 'Find an Event', desc: 'Browse upcoming speed dating events in your area', color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' },
-              { icon: Users, title: 'Meet & Mingle', desc: 'Attend the event and chat with other singles', color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' },
-              { icon: Heart, title: 'Make Your Choices', desc: 'Select the people you\'d like to connect with', color: 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400' },
-              { icon: MessageCircle, title: 'Get Matched!', desc: 'Mutual matches receive each other\'s contact info', color: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' },
+              {
+                icon: Calendar,
+                title: 'Create Event',
+                desc: 'Set date, venue, and capacity in minutes.',
+                color:
+                  'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+              },
+              {
+                icon: Users,
+                title: 'Register Participants',
+                desc: 'Share event link and collect participant profiles.',
+                color:
+                  'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
+              },
+              {
+                icon: Heart,
+                title: 'Collect Choices',
+                desc: 'Participants submit post-event preferences.',
+                color:
+                  'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400',
+              },
+              {
+                icon: MessageCircle,
+                title: 'Send Matches',
+                desc: 'Calculate mutual matches and send result emails.',
+                color:
+                  'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
+              },
             ].map((step, idx) => (
-              <div key={idx} className="relative">
-                <div className="text-center">
-                  <div className={`w-16 h-16 mx-auto rounded-2xl ${step.color} flex items-center justify-center mb-4`}>
-                    <step.icon className="h-8 w-8" />
-                  </div>
-                  <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary text-white text-sm flex items-center justify-center font-bold shadow-lg">
-                    {idx + 1}
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
-                  <p className="text-muted-foreground text-sm">{step.desc}</p>
+              <div key={idx} className="relative text-center">
+                <div
+                  className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl ${step.color}`}
+                >
+                  <step.icon className="h-8 w-8" />
                 </div>
+                <div className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white shadow-lg">
+                  {idx + 1}
+                </div>
+                <h3 className="mb-2 text-lg font-semibold">{step.title}</h3>
+                <p className="text-sm text-muted-foreground">{step.desc}</p>
                 {idx < 3 && (
-                  <div className="hidden md:block absolute top-8 -right-4 w-8 text-muted-foreground/30">
+                  <div className="absolute top-8 -right-4 hidden w-8 text-muted-foreground/30 md:block">
                     <ArrowRight className="h-6 w-6" />
                   </div>
                 )}
@@ -232,30 +309,51 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Why Choose Us Section */}
       <section className="py-20">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <Badge variant="outline" className="mb-4">Our Advantage</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Choose Us?</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              We&apos;re dedicated to helping you make meaningful connections
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-16 text-center">
+            <Badge variant="outline" className="mb-4">
+              Our Advantage
+            </Badge>
+            <h2 className="mb-4 text-3xl font-bold md:text-4xl">Why Pairivo</h2>
+            <p className="mx-auto max-w-2xl text-muted-foreground">
+              Built for practical event operations and participant experience
             </p>
           </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {[
-              { icon: Heart, title: 'Real Connections', desc: 'Meet real people face-to-face, not just swipe on profiles', color: 'text-pink-500' },
-              { icon: Shield, title: 'Safe & Vetted', desc: 'All events are professionally organized in safe venues', color: 'text-blue-500' },
-              { icon: Zap, title: 'Fun & Relaxed', desc: 'Enjoyable atmosphere designed to reduce first-date nerves', color: 'text-yellow-500' },
-              { icon: Clock, title: 'Efficient Matching', desc: 'Our system ensures you meet compatible people quickly', color: 'text-green-500' },
+              {
+                icon: Heart,
+                title: 'Real Connections',
+                desc: 'Offline events that prioritize face-to-face interactions.',
+                color: 'text-pink-500',
+              },
+              {
+                icon: Shield,
+                title: 'Data-Safe Workflow',
+                desc: 'Only mutual matches receive contact info after event completion.',
+                color: 'text-blue-500',
+              },
+              {
+                icon: Zap,
+                title: 'Fast Operations',
+                desc: 'From registration to notifications, managed in one place.',
+                color: 'text-yellow-500',
+              },
+              {
+                icon: Clock,
+                title: 'Clear Timeline',
+                desc: 'Status-driven flow for registration, matching, and follow-up.',
+                color: 'text-green-500',
+              },
             ].map((feature, idx) => (
-              <Card key={idx} className="border-0 shadow-lg hover:shadow-xl transition-all">
+              <Card key={idx} className="border-0 shadow-lg transition-all hover:shadow-xl">
                 <CardContent className="p-6 text-center">
-                  <div className={`w-14 h-14 mx-auto rounded-xl bg-muted flex items-center justify-center mb-4`}>
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-muted">
                     <feature.icon className={`h-7 w-7 ${feature.color}`} />
                   </div>
-                  <h3 className="font-semibold mb-2">{feature.title}</h3>
+                  <h3 className="mb-2 font-semibold">{feature.title}</h3>
                   <p className="text-sm text-muted-foreground">{feature.desc}</p>
                 </CardContent>
               </Card>
@@ -264,36 +362,54 @@ export default function HomePage() {
         </div>
       </section>
 
-
-
-      {/* Testimonials Section */}
       <section className="py-20">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <Badge variant="outline" className="mb-4">Success Stories</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Real Love Stories</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Hear from couples who found their match at our events
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-16 text-center">
+            <Badge variant="outline" className="mb-4">
+              Organizer Feedback
+            </Badge>
+            <h2 className="mb-4 text-3xl font-bold md:text-4xl">What Hosts Say</h2>
+            <p className="mx-auto max-w-2xl text-muted-foreground">
+              Feedback from teams running real events with Pairivo
             </p>
           </div>
-          
-          <div className="grid md:grid-cols-3 gap-8">
+
+          <div className="grid gap-8 md:grid-cols-3">
             {[
-              { name: 'Sarah & Michael', quote: 'We met at a Downtown Mixer and instantly clicked. Three years later, we\'re engaged!', rating: 5 },
-              { name: 'Emily & David', quote: 'The event was so fun and relaxed. I never expected to meet my soul mate there!', rating: 5 },
-              { name: 'Jessica & Tom', quote: 'Best decision ever to attend. The matching system is brilliant - we had so much in common!', rating: 5 },
+              {
+                name: 'NYC Host Team',
+                quote:
+                  'The check-in and participant management flow is much smoother than spreadsheets.',
+                rating: 5,
+              },
+              {
+                name: 'Berlin Organizer',
+                quote:
+                  'Automatic match emails saved us hours after every event.',
+                rating: 5,
+              },
+              {
+                name: 'London Community Lead',
+                quote:
+                  'Participants understood the process quickly and completion rate improved.',
+                rating: 5,
+              },
             ].map((testimonial, idx) => (
               <Card key={idx} className="border-0 shadow-lg">
                 <CardContent className="p-6">
-                  <div className="flex gap-1 mb-4">
+                  <div className="mb-4 flex gap-1">
                     {[...Array(testimonial.rating)].map((_, i) => (
                       <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                     ))}
                   </div>
-                  <p className="text-muted-foreground mb-4">&quot;{testimonial.quote}&quot;</p>
+                  <p className="mb-4 text-muted-foreground">&quot;{testimonial.quote}&quot;</p>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-sm font-bold">
-                      {testimonial.name.split(' ')[0][0]}{testimonial.name.split(' ')[2][0]}
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-sm font-bold text-white">
+                      {testimonial.name
+                        .split(' ')
+                        .slice(0, 2)
+                        .map((part) => part[0])
+                        .join('')}
                     </div>
                     <span className="font-medium">{testimonial.name}</span>
                   </div>
@@ -304,71 +420,124 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-primary to-accent text-white">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <Heart className="h-16 w-16 mx-auto mb-6 opacity-80" />
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Find Your Match?</h2>
-          <p className="text-white/80 mb-8 max-w-xl mx-auto">
-            Join thousands of singles who have found love at our events. Your perfect match might be waiting at the next one!
+      <section className="bg-gradient-to-r from-primary to-accent py-20 text-white">
+        <div className="mx-auto max-w-4xl px-4 text-center">
+          <Heart className="mx-auto mb-6 h-16 w-16 opacity-80" />
+          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
+            Ready to Run Your Next Event?
+          </h2>
+          <p className="mx-auto mb-8 max-w-xl text-white/80">
+            Launch an event page, register participants, and send match results
+            with a complete organizer workflow.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" variant="secondary" className="rounded-full px-8 h-14 text-lg">
-              Browse Events
+          <div className="flex flex-col justify-center gap-4 sm:flex-row">
+            <Button
+              size="lg"
+              variant="secondary"
+              className="h-14 rounded-full px-8 text-lg"
+              onClick={() => router.push('/faq')}
+            >
+              Participant Guide
             </Button>
-            <Button size="lg" variant="default" className="rounded-full px-8 h-14 text-lg">
+            <Button
+              size="lg"
+              className="h-14 rounded-full px-8 text-lg"
+              onClick={handleHostEvent}
+            >
               Host Your Own Event
             </Button>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-background border-t py-12">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
+      <footer className="border-t bg-background py-12">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="grid gap-8 md:grid-cols-4">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <Heart className="h-4 w-4 text-white fill-white" />
+              <div className="mb-4 flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
+                  <Heart className="h-4 w-4 fill-white text-white" />
                 </div>
-                <span className="font-bold">Date, Set, Match</span>
+                <span className="font-bold">Pairivo</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Bringing real people together for real connections since 2020.
+                SaaS platform for speed-dating organizers to run better events.
               </p>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Company</h4>
+              <h4 className="mb-4 font-semibold">Company</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-primary transition">About Us</a></li>
-                <li><a href="#" className="hover:text-primary transition">Careers</a></li>
-                <li><a href="#" className="hover:text-primary transition">Press</a></li>
+                <li>
+                  <Link href="/about" className="transition hover:text-primary">
+                    About Us
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/careers" className="transition hover:text-primary">
+                    Careers
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/press" className="transition hover:text-primary">
+                    Press
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Support</h4>
+              <h4 className="mb-4 font-semibold">Support</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-primary transition">FAQ</a></li>
-                <li><a href="#" className="hover:text-primary transition">Contact</a></li>
-                <li><a href="#" className="hover:text-primary transition">Privacy Policy</a></li>
+                <li>
+                  <Link href="/faq" className="transition hover:text-primary">
+                    FAQ
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="transition hover:text-primary">
+                    Contact
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/privacy-policy"
+                    className="transition hover:text-primary"
+                  >
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/terms-of-service"
+                    className="transition hover:text-primary"
+                  >
+                    Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/refund-policy" className="transition hover:text-primary">
+                    Refund Policy
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Stay Updated</h4>
-              <div className="flex gap-2">
-                <Input 
-                  placeholder="Your email" 
+              <h4 className="mb-4 font-semibold">Stay Updated</h4>
+              <form className="flex gap-2" onSubmit={handleJoinWaitlist}>
+                <Input
+                  type="email"
+                  placeholder="Your email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setEmail(event.target.value)}
                   className="rounded-full"
                 />
-                <Button className="rounded-full px-6">Join</Button>
-              </div>
+                <Button className="rounded-full px-6" type="submit">
+                  Join
+                </Button>
+              </form>
             </div>
           </div>
-          <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-            © 2024 Date, Set, Match. All rights reserved.
+          <div className="mt-8 border-t pt-8 text-center text-sm text-muted-foreground">
+            © {new Date().getFullYear()} Pairivo. All rights reserved.
           </div>
         </div>
       </footer>

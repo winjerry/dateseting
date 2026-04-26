@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "title": "案例展示",
-    "description": "用 ShipAny 打造的精彩项目"
+    "title": "DateSet 案例展示",
+    "description": "看看其他开发者是如何使用 DateSet 构建他们的产品的"
   },
   "showcases": {
     "id": "showcase",
-    "sr_only_title": "案例展示",
-    "title": "用 ShipAny 构建的 AI SaaS 创业项目",
-    "description": "易用且极速上线。",
+    "sr_only_title": "DateSet 案例展示",
+    "title": "DateSet",
+    "description": "DateSet 是一个全栈 Next.js 样板代码，包含了构建 SaaS 产品所需的一切功能。",
     "items": [
       {
         "title": "ThinkAny",

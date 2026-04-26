@@ -39,6 +39,9 @@ export function LocaleSelector({
     }
   };
 
+  // Hide the locale selector for now as requested
+  return null;
+
   // Return a placeholder during SSR to avoid hydration mismatch
   if (!mounted) {
     return (

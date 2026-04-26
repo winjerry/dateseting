@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { findParticipantByToken, submitParticipantChoices, getParticipantsByEventId } from '@/shared/models/participant';
+import { findParticipantByToken, submitParticipantChoices, getParticipantsByEventId, getParticipantChoices } from '@/shared/models/participant';
 import { findEventById, EventStatus } from '@/shared/models/event';
 
 // 提交选择请求验证
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.errors },
+        { error: 'Validation failed', details: validation.error.format() },
         { status: 400 }
       );
     }
@@ -40,13 +40,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 检查是否已提交过
-    if (participant.hasSubmittedChoices) {
-      return NextResponse.json(
-        { error: 'Choices already submitted' },
-        { status: 400 }
-      );
-    }
+    // 检查是否已提交过 - ALLOW UPDATE
+    // if (participant.hasSubmittedChoices) {
+    //   return NextResponse.json(
+    //     { error: 'Choices already submitted' },
+    //     { status: 400 }
+    //   );
+    // }
 
     // 获取活动
     const event = await findEventById(participant.eventId);
@@ -54,6 +54,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
+      );
+    }
+
+    if (event.status !== EventStatus.COMPLETED) {
+      return NextResponse.json(
+        { error: 'Choices are only available after the event ends' },
+        { status: 400 }
       );
     }
 
@@ -111,6 +118,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const event = await findEventById(participant.eventId);
+    if (!event) {
+      return NextResponse.json(
+        { error: 'Event not found' },
+        { status: 404 }
+      );
+    }
+
+    if (event.status !== EventStatus.COMPLETED) {
+      return NextResponse.json(
+        { error: 'Choices will open after the event ends' },
+        { status: 400 }
+      );
+    }
+
     // 获取所有其他参与者
     const allParticipants = await getParticipantsByEventId(participant.eventId);
     const otherParticipants = allParticipants
@@ -123,10 +145,17 @@ export async function GET(request: NextRequest) {
         photoUrl: p.photoUrl,
       }));
 
+    // 获取已选列表（如果有）
+    let existingChoices: string[] = [];
+    if (participant.hasSubmittedChoices) {
+      existingChoices = await getParticipantChoices(participant.id);
+    }
+
     return NextResponse.json({
       success: true,
       hasSubmitted: participant.hasSubmittedChoices,
       participants: otherParticipants,
+      choices: existingChoices,
     });
   } catch (error) {
     console.error('Error getting participants for choices:', error);

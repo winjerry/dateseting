@@ -5,6 +5,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable(
@@ -564,6 +565,7 @@ export const event = pgTable(
     location: text('location').notNull(),
     eventDate: timestamp('event_date').notNull(),
     eventTime: text('event_time').notNull(), // 活动时间 (e.g., "19:00")
+    eventEndTime: text('event_end_time'), // 活动结束时间 (e.g., "21:00")
 
     // 活动类型与容量
     eventType: text('event_type').notNull(), // 'standard' | 'large'
@@ -622,6 +624,7 @@ export const participant = pgTable(
     // 个人信息
     name: text('name').notNull(),
     age: integer('age').notNull(),
+    gender: text('gender'), // 'male' | 'female' | 'other'
     email: text('email').notNull(),
     phone: text('phone'),
     interests: text('interests'), // JSON数组存储
@@ -656,6 +659,7 @@ export const participant = pgTable(
     index('idx_participant_email').on(table.email),
     // 通过token验证
     index('idx_participant_token').on(table.choiceToken),
+    uniqueIndex('uq_participant_event_email').on(table.eventId, table.email),
   ]
 );
 

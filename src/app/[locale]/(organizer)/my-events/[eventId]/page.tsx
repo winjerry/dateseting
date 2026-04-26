@@ -2,13 +2,13 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Calendar, MapPin, Users, Clock, Heart, QrCode, Copy, Check, Mail, Settings, CheckCircle, ArrowLeft, Send, Download, Share2, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, Heart, QrCode, Copy, Check, Mail, Settings, CheckCircle, ArrowLeft, Send, Download, Share2, Loader2, Tv } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Progress } from '@/shared/components/ui/progress';
-import { Avatar, AvatarFallback } from '@/shared/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/avatar';
 import { toast } from 'sonner';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -38,7 +38,10 @@ export default function EventDetailPage() {
 
   const [copied, setCopied] = useState(false);
   const [calculating, setCalculating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
+  const supportEmail =
+    process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@pairivo.com';
 
   // Load Data
   useEffect(() => {
@@ -50,16 +53,17 @@ export default function EventDetailPage() {
         const res = await fetch(`/api/events/${eventId}`);
         const data = await res.json();
         
-        if (data.success && data.event) {
+        if (res.ok && data.success && data.event) {
           setEvent(data.event);
           setParticipants(data.participants || []);
         } else {
+          // Fallback only on 404 or specific error, otherwise throw
           throw new Error(data.error || 'Failed to load event');
         }
       } catch (error) {
-        console.warn('Failed to load from API (likely no DB), falling back to mock data:', error);
-        setEvent({ ...MOCK_EVENT, id: eventId }); // Use current ID for mock
-        setParticipants(MOCK_PARTICIPANTS);
+        console.error('Failed to load event data:', error);
+        toast.error('Could not load event details');
+        // Do NOT set mock data here anymore to avoid confusion
       } finally {
         setLoading(false);
       }
@@ -102,22 +106,16 @@ export default function EventDetailPage() {
         if (data.success) {
             toast.success(`Found ${data.matchCount} matches!`);
             // Refresh Data
-            setEvent({ ...event, isMatchingCompleted: true });
+            setEvent({ 
+              ...event, 
+              isMatchingCompleted: true,
+              matchesCount: data.matchCount // Update count from API
+            });
         } else {
-            // Mock Fallback
-            if (res.status === 500) {
-                 await new Promise((r) => setTimeout(r, 1000)); 
-                 toast.success('Found 12 matches! (Mock)'); 
-                 setEvent({ ...event, isMatchingCompleted: true });
-            } else {
-                 toast.error(data.error);
-            }
+             toast.error(data.error || 'Failed to calculate matches');
         }
     } catch (e) {
-        // Fallback
-        await new Promise((r) => setTimeout(r, 1000)); 
-        toast.success('Found 12 matches! (Mock Fallback)'); 
-        setEvent({ ...event, isMatchingCompleted: true });
+        toast.error('Failed to calculate matches');
     } finally {
         setCalculating(false); 
     }
@@ -134,19 +132,53 @@ export default function EventDetailPage() {
           const data = await res.json();
           
           if (data.success) {
-              toast.success(data.message || 'Emails sent successfully', { id: toastId });
-          } else {
-              // Mock Fallback for 500 errors
-              if (res.status === 500) {
-                  throw new Error('Server Error');
+              if (data.stats) {
+                toast.success(`Processed ${data.stats.total} emails: ${data.stats.success} sent, ${data.stats.failed} failed`, { id: toastId });
+              } else {
+                toast.success(data.message || 'Emails sent successfully', { id: toastId });
               }
+          } else {
               toast.error(data.error || 'Failed to send emails', { id: toastId });
           }
       } catch (e) {
-          // Fallback logic
-           await new Promise((r) => setTimeout(r, 1000));
-           toast.success(`Emails sent successfully (Mock Fallback)`, { id: toastId });
+          toast.error('Failed to send emails', { id: toastId });
+       }
+   };
+
+  const handleIncreaseCapacity = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ increaseCapacity: true }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to increase capacity');
       }
+
+      setEvent((prev: any) => ({ ...prev, ...data.event }));
+      toast.success('Capacity updated');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to increase capacity');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const exportParticipants = () => {
+    window.open(`/api/events/${eventId}/participants/export`, '_blank');
+  };
+
+  const sendInvites = () => {
+    if (!event) return;
+    const subject = encodeURIComponent(`Join ${event.name}`);
+    const body = encodeURIComponent(
+      `Join my event here: ${window.location.origin}/e/${event.eventNo}`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   // Download QR code as PNG
@@ -190,6 +222,7 @@ export default function EventDetailPage() {
 
   const percentFull = event.capacity ? (event.currentParticipants / event.capacity) * 100 : 0;
   const shareLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/e/${event.eventNo}`;
+  const submittedChoicesCount = participants.filter(p => p.hasSubmittedChoices).length;
 
   return (
     <div className="space-y-6">
@@ -205,16 +238,24 @@ export default function EventDetailPage() {
           </div>
         </div>
         <Button onClick={copyShareLink} className="gap-2">{copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}Share</Button>
+        <Button 
+          variant="secondary"
+          className="gap-2"
+          onClick={() => window.open(`/e/${event.eventNo}/live`, '_blank')}
+        >
+          <Tv className="h-4 w-4" />
+          Live Screen
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Users className="h-4 w-4 text-blue-500" />Participants</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{event.currentParticipants}/{event.capacity}</div><Progress value={percentFull} className="mt-2 h-2" /></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Send className="h-4 w-4 text-green-500" />Choices Submitted</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">32/45</div><Progress value={71} className="mt-2 h-2" /></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Heart className="h-4 w-4 text-pink-500" />Matches</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{event.isMatchingCompleted ? '12' : '0'}</div><Button size="sm" className="mt-2" onClick={calculateMatches} disabled={calculating}>{calculating ? 'Calculating...' : 'Calculate Matches'}</Button></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Send className="h-4 w-4 text-green-500" />Choices Submitted</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{submittedChoicesCount}/{event.currentParticipants}</div><Progress value={event.currentParticipants ? (submittedChoicesCount / event.currentParticipants) * 100 : 0} className="mt-2 h-2" /></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Heart className="h-4 w-4 text-pink-500" />Matches</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{event.isMatchingCompleted ? (event.matchesCount || 0) : '-'}</div><Button size="sm" className="mt-2" onClick={calculateMatches} disabled={calculating}>{calculating ? 'Calculating...' : 'Calculate Matches'}</Button></CardContent></Card>
       </div>
 
       <Tabs defaultValue="participants" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
           <TabsTrigger value="participants" className="gap-2"><Users className="h-4 w-4" />Participants</TabsTrigger>
           <TabsTrigger value="share" className="gap-2"><QrCode className="h-4 w-4" />Share</TabsTrigger>
           <TabsTrigger value="emails" className="gap-2"><Mail className="h-4 w-4" />Emails</TabsTrigger>
@@ -226,7 +267,7 @@ export default function EventDetailPage() {
             <CardContent><div className="space-y-3">{participants.map((p) => (
               <div key={p.id} className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="flex items-center gap-3">
-                  <Avatar><AvatarFallback className="bg-primary/10 text-primary">{p.name ? p.name.split(' ').map((n: string) => n[0]).join('') : '?'}</AvatarFallback></Avatar>
+                  <Avatar><AvatarImage src={p.photoUrl || undefined} /><AvatarFallback className="bg-primary/10 text-primary">{p.name ? p.name.split(' ').map((n: string) => n[0]).join('') : '?'}</AvatarFallback></Avatar>
                   <div><div className="font-medium">{p.name}</div><div className="text-sm text-muted-foreground">{p.age} • {p.email}</div></div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -234,6 +275,11 @@ export default function EventDetailPage() {
                 </div>
               </div>
             ))}</div></CardContent>
+            <div className="px-6 pb-6">
+              <Button variant="outline" onClick={exportParticipants}>
+                Export CSV
+              </Button>
+            </div>
           </Card>
         </TabsContent>
         
@@ -274,7 +320,7 @@ export default function EventDetailPage() {
               </div>
               {/* Action Buttons */}
               <div className="grid grid-cols-2 gap-4">
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2" onClick={sendInvites}>
                   <Mail className="h-4 w-4" />
                   Send Invites
                 </Button>
@@ -352,6 +398,9 @@ export default function EventDetailPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-4 border rounded-lg"><div><p className="font-medium">Status</p><p className="text-sm text-muted-foreground">Control registration</p></div>{getStatusBadge(event.status)}</div>
               <div className="flex items-center justify-between p-4 border rounded-lg"><div><p className="font-medium">Package</p><p className="text-sm text-muted-foreground">{event.eventType === 'standard' ? 'Standard - 100 people' : 'Large - 200 people'}</p></div><Badge variant="outline" className="capitalize">{event.eventType}</Badge></div>
+              <div className="flex items-center justify-between p-4 border rounded-lg"><div><p className="font-medium">Manage Capacity</p><p className="text-sm text-muted-foreground">Increase capacity by one package step</p></div><Button variant="outline" disabled={saving} onClick={handleIncreaseCapacity}>{saving ? 'Updating...' : `Increase by ${event.eventType === 'large' ? 200 : 100}`}</Button></div>
+              <div className="flex items-center justify-between p-4 border rounded-lg"><div><p className="font-medium">Edit Event</p><p className="text-sm text-muted-foreground">Update details without starting a new payment</p></div><Button variant="outline" onClick={() => router.push(`/my-events/create?id=${event.id}`)}>Edit Details</Button></div>
+              <div className="flex items-center justify-between p-4 border rounded-lg"><div><p className="font-medium">Support</p><p className="text-sm text-muted-foreground">{supportEmail}</p></div><Button variant="outline" onClick={() => window.location.href = `mailto:${supportEmail}`}>Contact Support</Button></div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -86,9 +86,9 @@
   },
   "hero": {
     "id": "hero",
-    "title": "Ship AI Startups in hours, not days",
-    "highlight_text": "in hours",
-    "description": "ShipAny is a NextJS boilerplate for building AI SaaS startups.<br/>Ship Fast with a variety of templates and components.",
+    "title": "Build Your AI SaaS Fast",
+    "highlight_text": "Fast",
+    "description": "DateSet is the ultimate Next.js boilerplate for building AI SaaS products, featuring authentication, payments, blog, admin dashboard, and more.",
     "announcement": {
       "badge": "New",
       "title": "🎉 ShipAny Template Two",
@@ -410,13 +410,12 @@
   },
   "faq": {
     "id": "faq",
-    "title": "Frequently Asked Questions About ShipAny",
-    "description": "Have another question? Contact us on Discord or by email.",
-    "tip": "Can't find what you're looking for? Contact our <a href='https://discord.gg/HQNnrzjZQS' target='_blank' class='text-primary font-medium hover:underline'>customer support team</a>",
+    "title": "FAQ",
+    "description": "Frequently asked questions about DateSet",
     "items": [
       {
-        "question": "What exactly is ShipAny and how does it work?",
-        "answer": "ShipAny is a comprehensive NextJS boilerplate designed specifically for building AI SaaS startups. It provides ready-to-use templates, infrastructure setup, and deployment tools that help you launch your AI business in hours instead of days."
+        "question": "What is DateSet?",
+        "answer": "DateSet is a full-stack Next.js boilerplate that helps developers build AI SaaS products quickly."
       },
       {
         "question": "Do I need advanced technical skills to use ShipAny?",

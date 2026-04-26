@@ -1,59 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import { Heart, Loader2, CheckCircle, Send, ArrowLeft, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/avatar';
 import { Badge } from '@/shared/components/ui/badge';
 import { toast } from 'sonner';
-
-// 模拟参与者数据
-const MOCK_PARTICIPANTS = [
-  { 
-    id: '1', 
-    name: 'Sarah', 
-    age: 28, 
-    interests: ['Travel', 'Music', 'Coffee'], 
-    photoUrl: '' 
-  },
-  { 
-    id: '2', 
-    name: 'Michael', 
-    age: 32, 
-    interests: ['Photography', 'Hiking', 'Food'], 
-    photoUrl: '' 
-  },
-  { 
-    id: '3', 
-    name: 'Emily', 
-    age: 26, 
-    interests: ['Art', 'Dancing', 'Movies'], 
-    photoUrl: '' 
-  },
-  { 
-    id: '4', 
-    name: 'James', 
-    age: 30, 
-    interests: ['Sports', 'Gaming', 'Tech'], 
-    photoUrl: '' 
-  },
-  { 
-    id: '5', 
-    name: 'Olivia', 
-    age: 27, 
-    interests: ['Reading', 'Cooking', 'Yoga'], 
-    photoUrl: '' 
-  },
-  { 
-    id: '6', 
-    name: 'David', 
-    age: 29, 
-    interests: ['Music', 'Fitness', 'Travel'], 
-    photoUrl: '' 
-  },
-];
 
 const INTEREST_COLORS: Record<string, string> = {
   Travel: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
@@ -75,11 +29,53 @@ const INTEREST_COLORS: Record<string, string> = {
 };
 
 export default function ChoicesPage() {
+  const params = useParams();
+  const router = useRouter();
+  const eventNo = params.eventNo as string;
+
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [participants, setParticipants] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [error, setError] = useState('');
 
-  const participants = MOCK_PARTICIPANTS;
+  useEffect(() => {
+    const fetchParticipants = async () => {
+      const token = localStorage.getItem(`participant_token_${eventNo}`);
+      
+      if (!token) {
+        toast.error('Session expired. Please register again.');
+        router.push(`/e/${eventNo}/register`);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/participants/choices?token=${token}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to load participants');
+        }
+
+        setParticipants(data.participants);
+        if (data.choices && Array.isArray(data.choices)) {
+          setSelectedIds(data.choices);
+        }
+        if (data.hasSubmitted) {
+          setSubmitted(true);
+        }
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message);
+        toast.error('Failed to load participants');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchParticipants();
+  }, [eventNo, router]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) =>
@@ -94,11 +90,55 @@ export default function ChoicesPage() {
     }
     
     setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setSubmitted(true);
-    toast.success('Your choices have been submitted!');
-    setSubmitting(false);
+    const token = localStorage.getItem(`participant_token_${eventNo}`);
+
+    try {
+      const res = await fetch('/api/participants/choices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          choices: selectedIds
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Submission failed');
+      }
+
+      setSubmitted(true);
+      toast.success('Your choices have been submitted!');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Something went wrong');
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 px-4">
+        <Card className="max-w-md w-full text-center">
+          <CardContent className="pt-10">
+            <h2 className="text-xl font-bold mb-2">Oops!</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
@@ -114,7 +154,16 @@ export default function ChoicesPage() {
               Thank you! You&apos;ll receive an email with your matches soon.
               Fingers crossed! 🤞
             </p>
-            <div className="bg-muted/50 rounded-lg p-4 text-sm">
+            
+            <Button 
+              variant="outline" 
+              onClick={() => setSubmitted(false)}
+              className="w-full mb-4"
+            >
+              Change My Choices
+            </Button>
+
+            <div className="bg-muted/50 rounded-lg p-4 text-sm text-left">
               <p className="font-medium">What happens next?</p>
               <p className="text-muted-foreground mt-1">
                 We&apos;ll calculate mutual matches and send you an email with 
@@ -204,7 +253,7 @@ export default function ChoicesPage() {
                       <span className="text-sm text-muted-foreground">{p.age}</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      {p.interests.map((interest) => (
+                      {p.interests.map((interest: string) => (
                         <span
                           key={interest}
                           className={`text-xs px-2 py-0.5 rounded-full ${

@@ -21,12 +21,76 @@ export default function CreateEventPage() {
     location: '',
     eventDate: '',
     eventTime: '19:00',
+    eventEndTime: '21:00',
     eventType: 'standard',
   });
 
   useEffect(() => {
     const id = searchParams.get('id');
-    if (!id) return;
+    const draftId = searchParams.get('draftId');
+
+    if (draftId) {
+      const fetchDraft = async () => {
+        try {
+          setLoading(true);
+          // Clear any stale session storage to avoid conflicts
+          sessionStorage.removeItem('event_draft');
+          
+          const res = await fetch(`/api/events/draft?orderNo=${draftId}`);
+          const data = await res.json();
+          if (res.ok && data.draft) {
+            const d = data.draft;
+            
+            // Handle date parsing safely
+            let formattedDate = '';
+            if (d.eventDate) {
+              try {
+                // If it's already YYYY-MM-DD, use it. If ISO, slice it.
+                formattedDate = d.eventDate.includes('T') 
+                  ? d.eventDate.slice(0, 10) 
+                  : d.eventDate;
+              } catch (e) {
+                console.warn('Date parsing failed', e);
+              }
+            }
+
+            setFormData({
+              name: d.name || '',
+              description: d.description || '',
+              location: d.location || '',
+              eventDate: formattedDate,
+              eventTime: d.eventTime || '19:00',
+              eventEndTime: d.eventEndTime || '21:00',
+              eventType: d.eventType || 'standard',
+            });
+          } else {
+            toast.error('Draft data is empty or not found');
+          }
+        } catch (error) {
+          console.error('Failed to fetch draft', error);
+          toast.error('Failed to load draft');
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchDraft();
+      return;
+    }
+
+    if (!id) {
+      // If no ID, try to load draft from sessionStorage
+      try {
+        const draft = sessionStorage.getItem('event_draft');
+        if (draft) {
+          const parsed = JSON.parse(draft);
+          setFormData(parsed);
+        }
+      } catch (e) {
+        console.error('Failed to parse draft', e);
+      }
+      return;
+    }
+
     const fetchEvent = async () => {
       try {
         setLoading(true);
@@ -40,6 +104,7 @@ export default function CreateEventPage() {
             location: e.location || '',
             eventDate: e.eventDate ? new Date(e.eventDate).toISOString().slice(0, 10) : '',
             eventTime: e.eventTime || '19:00',
+            eventEndTime: e.eventEndTime || '21:00',
             eventType: e.eventType || 'standard',
           });
         }
@@ -52,10 +117,55 @@ export default function CreateEventPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate date and time
+    const eventStart = new Date(`${formData.eventDate}T${formData.eventTime}`);
+    const eventEnd = new Date(`${formData.eventDate}T${formData.eventEndTime}`);
+    const now = new Date();
+    
+    if (eventStart < now) {
+      toast.error('Event start time must be in the future');
+      return;
+    }
+
+    if (eventEnd <= eventStart) {
+      toast.error('Event end time must be after start time');
+      return;
+    }
+
+    // Check if duration is within 24 hours
+    const durationHours = (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60);
+    if (durationHours > 24) {
+      toast.error('Event duration cannot exceed 24 hours');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      sessionStorage.setItem('event_draft', JSON.stringify(formData));
+      const draftId = searchParams.get('draftId');
+      
+      // If editing a draft, update it in the database immediately
+      if (draftId) {
+        const res = await fetch('/api/events/draft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderNo: draftId, ...formData }),
+        });
+        
+        if (!res.ok) {
+          throw new Error('Failed to update draft');
+        }
+      }
+
+      sessionStorage.setItem(
+        'event_draft',
+        JSON.stringify({
+          ...formData,
+          draftId,
+          eventId: searchParams.get('id') || undefined,
+        })
+      );
       router.push('/my-events/create/confirm');
     } catch (error: any) {
       console.error(error);
@@ -68,6 +178,8 @@ export default function CreateEventPage() {
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  const isEditing = !!searchParams.get('id') || !!searchParams.get('draftId');
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -83,8 +195,8 @@ export default function CreateEventPage() {
               <CalendarPlus className="h-6 w-6 text-white" />
             </div>
             <div>
-              <CardTitle className="text-xl">Create New Event</CardTitle>
-              <CardDescription>Set up your speed dating event in minutes</CardDescription>
+              <CardTitle className="text-xl">{isEditing ? 'Edit Event' : 'Create New Event'}</CardTitle>
+              <CardDescription>{isEditing ? 'Update your event details' : 'Set up your speed dating event in minutes'}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -102,14 +214,34 @@ export default function CreateEventPage() {
               <Label htmlFor="location">Location *</Label>
               <Input id="location" placeholder="e.g., The Social Club, 123 Main St" value={formData.location} onChange={(e) => updateField('location', e.target.value)} required className="h-11" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="eventDate">Date *</Label>
-                <Input id="eventDate" type="date" value={formData.eventDate} onChange={(e) => updateField('eventDate', e.target.value)} required className="h-11" />
+                <Input 
+                  id="eventDate" 
+                  type="date" 
+                  min={new Date().toISOString().split('T')[0]}
+                  value={formData.eventDate} 
+                  onChange={(e) => updateField('eventDate', e.target.value)} 
+                  required 
+                  className="h-11" 
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="eventTime">Time *</Label>
+                <Label htmlFor="eventTime">Start Time *</Label>
                 <Input id="eventTime" type="time" value={formData.eventTime} onChange={(e) => updateField('eventTime', e.target.value)} required className="h-11" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="eventEndTime">End Time *</Label>
+                <Input 
+                  id="eventEndTime" 
+                  type="time" 
+                  min={formData.eventTime}
+                  value={formData.eventEndTime} 
+                  onChange={(e) => updateField('eventEndTime', e.target.value)} 
+                  required 
+                  className="h-11" 
+                />
               </div>
             </div>
             <div className="space-y-3">
@@ -135,7 +267,7 @@ export default function CreateEventPage() {
               <Button type="button" variant="outline" className="flex-1 h-12" onClick={() => router.back()}>Cancel</Button>
               <Button type="submit" className="flex-1 h-12 text-base font-semibold" disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Create Event
+                {isEditing ? 'Update & Continue' : 'Create Event'}
               </Button>
             </div>
           </form>

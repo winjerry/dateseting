@@ -32,4 +32,9 @@ export const envConfigs = {
   auth_secret: process.env.AUTH_SECRET ?? '', // openssl rand -base64 32
   resend_api_key: process.env.RESEND_API_KEY ?? '',
   resend_sender_email: process.env.RESEND_SENDER_EMAIL ?? 'onboarding@resend.dev',
+  cron_secret: process.env.CRON_SECRET ?? '',
+  support_email:
+    process.env.SUPPORT_EMAIL ??
+    process.env.NEXT_PUBLIC_SUPPORT_EMAIL ??
+    'support@pairivo.com',
 };

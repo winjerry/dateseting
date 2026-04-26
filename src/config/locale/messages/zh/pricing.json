@@ -5,9 +5,9 @@
   },
   "pricing": {
     "id": "pricing",
-    "sr_only_title": "ShipAny 价格表",
+    "sr_only_title": "DateSet 价格表",
     "title": "价格",
-    "description": "获取 ShipAny 的全部功能，极速交付你的 AI SaaS 创业项目。",
+    "description": "获取 DateSet 的全部功能，极速交付你的 AI SaaS 创业项目。",
     "groups": [
       {
         "name": "one-time",

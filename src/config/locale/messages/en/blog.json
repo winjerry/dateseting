@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "title": "Blog",
-    "description": "Read about our latest product features, solutions, and updates."
+    "title": "DateSet Blog",
+    "description": "Latest news and updates from DateSet"
   },
   "blog": {
     "id": "blog",
-    "sr_only_title": "ShipAny Blog",
-    "title": "Blog",
-    "description": "Read about our latest product features, solutions, and updates."
+    "sr_only_title": "DateSet Blog",
+    "title": "DateSet Blog",
+    "description": "Latest news and updates from DateSet"
   },
   "page": {
     "all": "All",

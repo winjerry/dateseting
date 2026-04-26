@@ -1,34 +1,65 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Calendar, MapPin, Users, Clock, Heart, Sparkles } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, Heart, Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Progress } from '@/shared/components/ui/progress';
 
-// 模拟活动数据
-const MOCK_EVENT = {
-  eventNo: 'EVT-20231215-A1B2',
-  name: 'Downtown Singles Mixer',
-  description: 'Join us for an exciting evening of meaningful connections! Meet like-minded singles in a fun, relaxed atmosphere.',
-  location: 'The Social Club, 123 Main Street, Downtown',
-  eventDate: '2024-12-20T00:00:00Z',
-  eventTime: '19:00',
-  capacity: 100,
-  currentParticipants: 45,
-  status: 'active',
-  isAcceptingRegistrations: true,
-  isFull: false,
-};
-
 export default function PublicEventPage() {
   const params = useParams();
   const router = useRouter();
   const eventNo = params.eventNo as string;
+  const [event, setEvent] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const event = MOCK_EVENT;
+  useEffect(() => {
+    if (eventNo) {
+      fetch(`/api/events/public?eventNo=${eventNo}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.event) {
+            setEvent(data.event);
+          } else {
+            setError(data.error || 'Event not found');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          setError('Failed to load event');
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  }, [eventNo]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !event) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10">
+        <Card className="max-w-md w-full">
+          <CardContent className="flex flex-col items-center py-10 text-center space-y-4">
+            <AlertCircle className="h-12 w-12 text-destructive" />
+            <h2 className="text-xl font-bold">Event Not Found</h2>
+            <p className="text-muted-foreground">{error || "The event you're looking for doesn't exist or has been removed."}</p>
+            <Button onClick={() => router.push('/')}>Go Home</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const spotsLeft = event.capacity - event.currentParticipants;
   const percentFull = (event.currentParticipants / event.capacity) * 100;
 
@@ -115,7 +146,7 @@ export default function PublicEventPage() {
             <div className="pt-2">
               {event.isFull ? (
                 <Button disabled className="w-full h-14 text-lg" size="lg">
-                  Event Full - Join Waitlist
+                  Event Full
                 </Button>
               ) : event.isAcceptingRegistrations ? (
                 <Button 
@@ -141,6 +172,18 @@ export default function PublicEventPage() {
               <Badge variant="outline" className="text-xs py-1">
                 ✓ Safe & Secure
               </Badge>
+            </div>
+
+            <div className="pt-2 border-t text-center">
+              <p className="text-sm text-muted-foreground">
+                Already registered?{' '}
+                <button 
+                  onClick={() => router.push(`/e/${eventNo}/login`)}
+                  className="text-primary font-medium hover:underline focus:outline-none"
+                >
+                  Click here to join
+                </button>
+              </p>
             </div>
           </CardContent>
         </Card>

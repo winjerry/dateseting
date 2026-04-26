@@ -109,7 +109,8 @@ export function SignUp({
         onSuccess: (ctx) => {
           // report affiliate
           reportAffiliate({ userEmail: email });
-          router.push(callbackUrl);
+          toast.success(t('sign_up_success'));
+          router.push('/sign-in');
         },
         onError: (e: any) => {
           toast.error(e?.error?.message || 'sign up failed');

@@ -94,7 +94,7 @@ export async function getSignUser() {
     reqHeaders = await mod.headers();
   } catch {}
   const session = await auth.api.getSession(
-    reqHeaders ? { headers: reqHeaders } : {}
+    reqHeaders ? { headers: reqHeaders } : { headers: new Headers() }
   );
 
   return session?.user;

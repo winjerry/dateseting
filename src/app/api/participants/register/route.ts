@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { findEventByEventNo, isEventFull, incrementParticipantCount, EventStatus } from '@/shared/models/event';
-import { createParticipant, isEmailRegisteredForEvent, ParticipantStatus, RegistrationSource } from '@/shared/models/participant';
+import { findEventByEventNo, EventStatus } from '@/shared/models/event';
+import {
+  ParticipantStatus,
+  RegistrationSource,
+  registerParticipantForEvent,
+} from '@/shared/models/participant';
 
 // 注册请求验证
 const registerSchema = z.object({
   eventNo: z.string().min(1, 'Event number is required'),
   name: z.string().min(1, 'Name is required').max(50),
   age: z.number().min(18, 'Must be 18 or older').max(100),
+  gender: z.enum(['male', 'female', 'other']).optional(),
   email: z.string().email('Invalid email'),
   phone: z.string().optional(),
   interests: z.array(z.string()).optional(),
@@ -22,12 +27,12 @@ export async function POST(request: NextRequest) {
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.errors },
+        { error: 'Validation failed', details: validation.error.format() },
         { status: 400 }
       );
     }
 
-    const { eventNo, name, age, email, phone, interests, photoUrl, source } = validation.data;
+    const { eventNo, name, age, gender, email, phone, interests, photoUrl, source } = validation.data;
 
     // 查找活动
     const event = await findEventByEventNo(eventNo);
@@ -46,27 +51,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 检查活动是否已满
-    if (await isEventFull(event.id)) {
-      return NextResponse.json(
-        { error: 'Event is full' },
-        { status: 400 }
-      );
-    }
-
-    // 检查邮箱是否已注册
-    if (await isEmailRegisteredForEvent(event.id, email)) {
-      return NextResponse.json(
-        { error: 'Email already registered for this event' },
-        { status: 400 }
-      );
-    }
-
-    // 创建参与者
-    const participant = await createParticipant({
+    // 创建参与者（事务化，防重复报名和超卖）
+    const participant = await registerParticipantForEvent(event.id, {
       eventId: event.id,
       name,
       age,
+      gender,
       email,
       phone,
       interests: interests ? JSON.stringify(interests) : null,
@@ -75,15 +65,13 @@ export async function POST(request: NextRequest) {
       status: ParticipantStatus.REGISTERED,
     });
 
-    // 增加参与人数
-    await incrementParticipantCount(event.id);
-
     return NextResponse.json({
       success: true,
       participant: {
         id: participant.id,
         name: participant.name,
         registeredAt: participant.registeredAt,
+        choiceToken: participant.choiceToken, // Return token for session
       },
       event: {
         id: event.id,
@@ -93,8 +81,27 @@ export async function POST(request: NextRequest) {
         location: event.location,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error registering participant:', error);
+
+    if (error?.message === 'EVENT_FULL') {
+      return NextResponse.json({ error: 'Event is full' }, { status: 400 });
+    }
+
+    if (error?.message === 'EMAIL_ALREADY_REGISTERED') {
+      return NextResponse.json(
+        { error: 'Email already registered for this event' },
+        { status: 400 }
+      );
+    }
+
+    if (error?.code === '23505') {
+      return NextResponse.json(
+        { error: 'Email already registered for this event' },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: 'Failed to register' },
       { status: 500 }

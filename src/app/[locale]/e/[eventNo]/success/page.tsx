@@ -1,212 +1,213 @@
 'use client';
 
-import { useState } from 'react';
-import { useParams } from 'next/navigation';
-import { CheckCircle, ChevronDown, ChevronUp, Heart, Camera, Sparkles, Share2, CalendarCheck } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Button } from '@/shared/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import {
+  CalendarCheck,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  Heart,
+  Loader2,
+  Sparkles,
+} from 'lucide-react';
+
 import { Badge } from '@/shared/components/ui/badge';
-
-// 模拟活动数据
-const MOCK_EVENT = {
-  name: 'Downtown Singles Mixer',
-  eventDate: '2024-12-20T00:00:00Z',
-  eventTime: '19:00',
-  location: 'The Social Club, 123 Main Street, Downtown',
-};
-
-// 模拟破冰问题数据
-const MOCK_ICEBREAKERS = {
-  icebreakers: [
-    { id: '1', question: "What's your favorite way to spend a weekend?" },
-    { id: '2', question: "If you could travel anywhere right now, where would you go?" },
-    { id: '3', question: "What's the last show you binge-watched?" },
-    { id: '4', question: "Are you a morning person or a night owl?" },
-    { id: '5', question: "What's your hidden talent?" },
-  ],
-  deeper: [
-    { id: '6', question: "What are you most passionate about in life?" },
-    { id: '7', question: "Where do you see yourself in 5 years?" },
-    { id: '8', question: "What makes you laugh the hardest?" },
-    { id: '9', question: "What's the most meaningful thing on your bucket list?" },
-    { id: '10', question: "What's most important to you in a relationship?" },
-  ],
-};
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/shared/components/ui/collapsible';
 
 export default function RegistrationSuccessPage() {
   const params = useParams();
+  const router = useRouter();
   const eventNo = params.eventNo as string;
 
+  const [event, setEvent] = useState<any>(null);
+  const [icebreakers, setIcebreakers] = useState<any>({ icebreakers: [], deeper: [] });
+  const [loading, setLoading] = useState(true);
   const [openIcebreaker, setOpenIcebreaker] = useState(true);
   const [openDeeper, setOpenDeeper] = useState(true);
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch(`/api/events/public?eventNo=${eventNo}`);
+        const data = await res.json();
+        if (data.success) {
+          setEvent(data.event);
+          setIcebreakers(data.icebreakers || { icebreakers: [], deeper: [] });
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [eventNo]);
+
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
     });
+
+  const handleAddToCalendar = () => {
+    if (!event) return;
+
+    const startDate = new Date(`${event.eventDate.split('T')[0]}T${event.eventTime}`);
+    const endDate = event.eventEndTime
+      ? new Date(`${event.eventDate.split('T')[0]}T${event.eventEndTime}`)
+      : new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+
+    const formatTime = (date: Date) => date.toISOString().replace(/-|:|\.\d\d\d/g, '');
+    const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.name)}&dates=${formatTime(startDate)}/${formatTime(endDate)}&details=${encodeURIComponent(`Join us for ${event.name}!`)}&location=${encodeURIComponent(event.location)}`;
+
+    window.open(googleCalendarUrl, '_blank');
   };
 
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!event) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle>Event not found</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => router.push('/')}>Go Home</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const canStartMatching = event.status === 'completed';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-background to-primary/5 dark:from-green-900/20 dark:via-background dark:to-primary/10 py-8 px-4">
-      <div className="max-w-lg mx-auto space-y-6">
-        {/* Success Animation Card */}
-        <Card className="overflow-hidden text-center border-0 shadow-xl">
-          {/* Confetti-like gradient top */}
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-background to-primary/5 px-4 py-8">
+      <div className="mx-auto max-w-lg space-y-6">
+        <Card className="overflow-hidden text-center shadow-xl">
           <div className="h-3 bg-gradient-to-r from-green-400 via-primary to-accent" />
-          
           <CardHeader className="pb-4 pt-8">
-            {/* Animated success icon */}
-            <div className="mx-auto w-24 h-24 rounded-full bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/50 dark:to-green-800/50 flex items-center justify-center mb-4 shadow-lg animate-pulse">
-              <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
+            <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40">
+              <CheckCircle className="h-12 w-12 text-green-600" />
             </div>
-            <CardTitle className="text-2xl bg-gradient-to-r from-green-600 to-primary bg-clip-text text-transparent">
-              You&apos;re In! 🎉
-            </CardTitle>
-            <p className="text-muted-foreground mt-2">
-              Registration confirmed. See you at the event!
+            <CardTitle className="text-2xl">You&apos;re In!</CardTitle>
+            <p className="mt-2 text-muted-foreground">
+              Registration confirmed. We&apos;ll see you at the event.
             </p>
           </CardHeader>
-          
+
           <CardContent className="space-y-4 pb-8">
-            {/* Event Summary */}
-            <div className="bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl p-5 text-left border">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <CalendarCheck className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-semibold text-lg">{MOCK_EVENT.name}</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {formatDate(MOCK_EVENT.eventDate)} at {MOCK_EVENT.eventTime}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {MOCK_EVENT.location}
-                  </p>
-                </div>
-              </div>
+            <div className="rounded-xl border bg-gradient-to-r from-primary/5 to-accent/5 p-5 text-left">
+              <p className="font-semibold text-lg">{event.name}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {formatDate(event.eventDate)} at {event.eventTime}
+              </p>
+              <p className="text-sm text-muted-foreground">{event.location}</p>
             </div>
 
-            {/* Next Steps */}
             <div className="text-left">
-              <p className="text-sm font-medium mb-2 flex items-center gap-2">
+              <p className="mb-2 flex items-center gap-2 text-sm font-medium">
                 <Sparkles className="h-4 w-4 text-primary" />
-                What&apos;s Next?
+                What&apos;s next?
               </p>
-              <ol className="text-sm text-muted-foreground space-y-1 pl-5">
-                <li>📧 Check your email for confirmation</li>
-                <li>📅 Add event to your calendar</li>
-                <li>💡 Review the conversation starters below!</li>
+              <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>Check your email for confirmation.</li>
+                <li>Add the event to your calendar.</li>
+                <li>Save the conversation starters below.</li>
               </ol>
             </div>
 
-            {/* Add to Calendar Button */}
-            <Button variant="outline" className="w-full gap-2">
-              <Share2 className="h-4 w-4" />
-              Add to Calendar
-            </Button>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Button
+                className="w-full gap-2"
+                disabled={!canStartMatching}
+                onClick={() => router.push(`/e/${eventNo}/choices`)}
+              >
+                <Heart className="h-4 w-4" />
+                {canStartMatching ? 'Start Matching' : 'Matching opens after the event'}
+              </Button>
+              <Button variant="outline" className="w-full gap-2" onClick={handleAddToCalendar}>
+                <CalendarCheck className="h-4 w-4" />
+                Add to Calendar
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Conversation Starters Card */}
-        <Card className="shadow-lg">
+        <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Sparkles className="h-5 w-5 text-primary" />
                 Conversation Starters
               </CardTitle>
-              <Badge variant="outline" className="text-xs gap-1">
-                <Camera className="h-3 w-3" />
-                Screenshot this!
-              </Badge>
+              <Badge variant="outline">Save these</Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Use these questions to break the ice at the event
-            </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Icebreaker Questions */}
             <Collapsible open={openIcebreaker} onOpenChange={setOpenIcebreaker}>
               <CollapsibleTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-between p-4 h-auto bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 rounded-lg"
-                >
-                  <span className="flex items-center gap-2 font-semibold">
-                    🧊 Icebreaker Questions
-                  </span>
-                  {openIcebreaker ? (
-                    <ChevronUp className="h-5 w-5" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5" />
-                  )}
+                <Button variant="ghost" className="w-full justify-between rounded-lg bg-blue-50 p-4">
+                  <span className="font-semibold">Icebreaker Questions</span>
+                  {openIcebreaker ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3 px-1">
-                <ul className="space-y-3">
-                  {MOCK_ICEBREAKERS.icebreakers.map((q, idx) => (
-                    <li key={q.id} className="flex gap-3 text-sm">
-                      <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 font-medium text-xs">
-                        {idx + 1}
-                      </span>
-                      <span>{q.question}</span>
-                    </li>
-                  ))}
+              <CollapsibleContent className="px-1 pt-3">
+                <ul className="space-y-3 text-sm">
+                  {icebreakers.icebreakers?.length ? (
+                    icebreakers.icebreakers.map((q: any, idx: number) => (
+                      <li key={q.id || idx} className="flex gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-600">
+                          {idx + 1}
+                        </span>
+                        <span>{q.question}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="text-muted-foreground italic">No icebreaker questions available yet.</li>
+                  )}
                 </ul>
               </CollapsibleContent>
             </Collapsible>
 
-            {/* Deeper Questions */}
             <Collapsible open={openDeeper} onOpenChange={setOpenDeeper}>
               <CollapsibleTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-between p-4 h-auto bg-purple-50 dark:bg-purple-950/30 hover:bg-purple-100 dark:hover:bg-purple-950/50 rounded-lg"
-                >
-                  <span className="flex items-center gap-2 font-semibold">
-                    💭 Getting to Know You
-                  </span>
-                  {openDeeper ? (
-                    <ChevronUp className="h-5 w-5" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5" />
-                  )}
+                <Button variant="ghost" className="w-full justify-between rounded-lg bg-purple-50 p-4">
+                  <span className="font-semibold">Getting to Know You</span>
+                  {openDeeper ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3 px-1">
-                <ul className="space-y-3">
-                  {MOCK_ICEBREAKERS.deeper.map((q, idx) => (
-                    <li key={q.id} className="flex gap-3 text-sm">
-                      <span className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 font-medium text-xs">
-                        {idx + 1}
-                      </span>
-                      <span>{q.question}</span>
-                    </li>
-                  ))}
+              <CollapsibleContent className="px-1 pt-3">
+                <ul className="space-y-3 text-sm">
+                  {icebreakers.deeper?.length ? (
+                    icebreakers.deeper.map((q: any, idx: number) => (
+                      <li key={q.id || idx} className="flex gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-100 text-xs font-medium text-purple-600">
+                          {idx + 1}
+                        </span>
+                        <span>{q.question}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="text-muted-foreground italic">No deeper questions available yet.</li>
+                  )}
                 </ul>
               </CollapsibleContent>
             </Collapsible>
-          </CardContent>
-        </Card>
-
-        {/* Pro Tip Card */}
-        <Card className="bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
-          <CardContent className="pt-5 pb-5">
-            <div className="flex gap-4">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                <Heart className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm">Pro Tip 💡</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Take a screenshot of these questions so you have them ready during the event. 
-                  Being prepared makes a great first impression!
-                </p>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>

@@ -579,7 +579,7 @@ export async function getSettings() {
       name: 'plausible_domain',
       title: 'Plausible Domain',
       type: 'text',
-      placeholder: 'shipany.site',
+      placeholder: 'dateset.site',
       group: 'plausible',
       tab: 'analytics',
     },

@@ -1,60 +1,61 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { CalendarPlus, Users, Heart, TrendingUp, Plus, Eye, Copy, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { CalendarPlus, Users, Heart, TrendingUp, Plus, Eye, Copy, Check, Loader2, CreditCard, Edit } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { toast } from 'sonner';
 
-// 模拟数据
-const MOCK_EVENTS = [
-  {
-    id: '1',
-    eventNo: 'EVT-20231215-A1B2',
-    name: 'Downtown Singles Mixer',
-    eventDate: '2024-12-20T00:00:00Z',
-    eventTime: '19:00',
-    location: 'The Social Club, Downtown',
-    status: 'active',
-    capacity: 100,
-    currentParticipants: 45,
-  },
-  {
-    id: '2',
-    eventNo: 'EVT-20231210-C3D4',
-    name: 'Tech Industry Speed Dating',
-    eventDate: '2024-12-25T00:00:00Z',
-    eventTime: '18:30',
-    location: 'Innovation Hub, Tech Park',
-    status: 'paid',
-    capacity: 100,
-    currentParticipants: 23,
-  },
-  {
-    id: '3',
-    eventNo: 'EVT-20231201-E5F6',
-    name: 'Winter Romance Night',
-    eventDate: '2024-12-08T00:00:00Z',
-    eventTime: '20:00',
-    location: 'Rooftop Lounge',
-    status: 'completed',
-    capacity: 200,
-    currentParticipants: 156,
-  },
-];
-
-const MOCK_STATS = {
-  totalEvents: 3,
-  activeEvents: 1,
-  completedEvents: 1,
-  totalParticipants: 224,
-};
-
 export default function MyEventsDashboard() {
   const router = useRouter();
+  const params = useParams();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [events, setEvents] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    totalEvents: 0,
+    activeEvents: 0,
+    completedEvents: 0,
+    totalParticipants: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+
+      const res = await fetch('/api/events/list?includeStats=true');
+      
+      if (res.status === 401) {
+        toast.error('Session expired. Please sign in again.');
+        const locale = params.locale || 'en';
+        router.push(`/${locale}/sign-in`);
+        return;
+      }
+
+      const data = await res.json();
+      
+      if (res.ok && data.events) {
+        setEvents(data.events);
+        if (data.stats) {
+          setStats(data.stats);
+        }
+      } else {
+        console.error('Fetch events error:', data);
+        toast.error(data.error || data.message || 'Failed to fetch events');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
@@ -69,11 +70,16 @@ export default function MyEventsDashboard() {
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
+    if (!dateStr) return 'TBD';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return 'Invalid Date';
+    }
   };
 
   const copyShareLink = (eventNo: string) => {
@@ -82,6 +88,14 @@ export default function MyEventsDashboard() {
     setCopiedId(eventNo);
     toast.success('Link copied!');
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handlePayNow = (checkoutUrl: string) => {
+    if (checkoutUrl) {
+      window.location.href = checkoutUrl;
+    } else {
+      toast.error('Checkout URL not available');
+    }
   };
 
   return (
@@ -113,7 +127,7 @@ export default function MyEventsDashboard() {
             <CalendarPlus className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{MOCK_STATS.totalEvents}</div>
+            <div className="text-2xl font-bold">{stats.totalEvents}</div>
             <p className="text-xs text-muted-foreground">Events created</p>
           </CardContent>
         </Card>
@@ -123,7 +137,7 @@ export default function MyEventsDashboard() {
             <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{MOCK_STATS.activeEvents}</div>
+            <div className="text-2xl font-bold">{stats.activeEvents}</div>
             <p className="text-xs text-muted-foreground">Currently running</p>
           </CardContent>
         </Card>
@@ -133,7 +147,7 @@ export default function MyEventsDashboard() {
             <Users className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{MOCK_STATS.totalParticipants}</div>
+            <div className="text-2xl font-bold">{stats.totalParticipants}</div>
             <p className="text-xs text-muted-foreground">Across all events</p>
           </CardContent>
         </Card>
@@ -143,7 +157,7 @@ export default function MyEventsDashboard() {
             <Heart className="h-4 w-4 text-pink-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{MOCK_STATS.completedEvents}</div>
+            <div className="text-2xl font-bold">{stats.completedEvents}</div>
             <p className="text-xs text-muted-foreground">Events finished</p>
           </CardContent>
         </Card>
@@ -156,55 +170,96 @@ export default function MyEventsDashboard() {
           <CardDescription>View and manage all your speed dating events</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {MOCK_EVENTS.map((event) => (
-              <div
-                key={event.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors gap-4"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium">{event.name}</h3>
-                    {getStatusBadge(event.status)}
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : events.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No events found. Create your first event to get started!
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {events.map((event) => (
+                <div
+                  key={event.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors gap-4"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium">{event.name}</h3>
+                      {getStatusBadge(event.status)}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDate(event.eventDate)} at {event.eventTime} • {event.location}
+                    </p>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {event.currentParticipants} / {event.capacity}
+                      </span>
+                      <span className="text-muted-foreground">
+                        Code: <code className="bg-muted px-1 rounded">{event.eventNo}</code>
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDate(event.eventDate)} at {event.eventTime} • {event.location}
-                  </p>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="flex items-center gap-1">
-                      <Users className="h-3 w-3" />
-                      {event.currentParticipants} / {event.capacity}
-                    </span>
-                    <span className="text-muted-foreground">
-                      Code: <code className="bg-muted px-1 rounded">{event.eventNo}</code>
-                    </span>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push(`/my-events/${event.id}`)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    View
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyShareLink(event.eventNo)}
-                  >
-                    {copiedId === event.eventNo ? (
-                      <Check className="h-4 w-4 mr-1 text-green-500" />
-                    ) : (
-                      <Copy className="h-4 w-4 mr-1" />
+                  <div className="flex gap-2">
+                    {event.isDraft ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/my-events/create?draftId=${event.orderNo}`)}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handlePayNow(event.checkoutUrl)}
+                          className="bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
+                          <CreditCard className="h-4 w-4 mr-1" />
+                          Pay Now
+                        </Button>
+                      </>
+                     ) : (
+                       <>
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => router.push(`/my-events/create?id=${event.id}`)}
+                         >
+                           <Edit className="h-4 w-4 mr-1" />
+                           Edit
+                         </Button>
+                         <Button
+                           variant="outline"
+                           size="sm"
+                          onClick={() => router.push(`/my-events/${event.id}`)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyShareLink(event.eventNo)}
+                        >
+                          {copiedId === event.eventNo ? (
+                            <Check className="h-4 w-4 mr-1 text-green-500" />
+                          ) : (
+                            <Copy className="h-4 w-4 mr-1" />
+                          )}
+                          Share
+                        </Button>
+                      </>
                     )}
-                    Share
-                  </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

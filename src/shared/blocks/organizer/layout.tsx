@@ -80,13 +80,6 @@ export function OrganizerLayout({ children }: OrganizerLayoutProps) {
             </nav>
 
             <div className="flex items-center gap-4">
-                <Link href="/my-events/create">
-                  <Button size="sm" className="gap-2">
-                    <CalendarPlus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Create Event</span>
-                  </Button>
-                </Link>
-
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-8 w-8 rounded-full ml-auto">

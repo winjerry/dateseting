@@ -1,6 +1,7 @@
 import { and, count, desc, eq, isNull, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
+import { envConfigs } from '@/config';
 import { db } from '@/core/db';
 import { event } from '@/config/db/schema';
 import { appendUserToResult, User } from './user';
@@ -39,6 +40,10 @@ export const EVENT_CAPACITIES = {
   [EventType.LARGE]: 200,
 };
 
+export function buildEventShareLink(eventNo: string): string {
+  return `${envConfigs.app_url}/e/${eventNo}`;
+}
+
 // =========================================
 // Event CRUD Operations
 // =========================================
@@ -59,6 +64,7 @@ export function generateEventNo(): string {
 export async function createEvent(newEvent: Omit<NewEvent, 'id' | 'eventNo' | 'createdAt' | 'updatedAt'>): Promise<Event> {
   const id = uuidv4();
   const eventNo = generateEventNo();
+  const shareLink = newEvent.shareLink || buildEventShareLink(eventNo);
   
   const [result] = await db()
     .insert(event)
@@ -66,6 +72,7 @@ export async function createEvent(newEvent: Omit<NewEvent, 'id' | 'eventNo' | 'c
       ...newEvent,
       id,
       eventNo,
+      shareLink,
     })
     .returning();
 
@@ -105,11 +112,58 @@ export async function getEvents({
     .limit(limit)
     .offset((page - 1) * limit);
 
+  // Lazy update logic removed here - moved to dedicated cron API
+
   if (getUser) {
     return appendUserToResult(result);
   }
 
   return result;
+}
+
+/**
+ * Update event statuses based on time (for cron job)
+ */
+export async function updateEventStatuses(): Promise<{ updated: number, details: any[] }> {
+  const now = new Date();
+  
+  // Find all non-completed/cancelled events
+  const activeEvents = await db()
+    .select()
+    .from(event)
+    .where(
+      and(
+        sql`${event.status} IN ('paid', 'active')`,
+        isNull(event.deletedAt)
+      )
+    );
+
+  const updates: { id: string, status: EventStatus }[] = [];
+
+  for (const e of activeEvents) {
+    const eventStart = new Date(`${e.eventDate.toISOString().split('T')[0]}T${e.eventTime}`);
+    let eventEnd = new Date(eventStart);
+    
+    if (e.eventEndTime) {
+      eventEnd = new Date(`${e.eventDate.toISOString().split('T')[0]}T${e.eventEndTime}`);
+    } else {
+      eventEnd.setHours(eventEnd.getHours() + 2);
+    }
+
+    if (now > eventEnd && e.status !== EventStatus.COMPLETED) {
+      updates.push({ id: e.id, status: EventStatus.COMPLETED });
+    } else if (now >= eventStart && now <= eventEnd && e.status === EventStatus.PAID) {
+      updates.push({ id: e.id, status: EventStatus.ACTIVE });
+    }
+  }
+
+  if (updates.length > 0) {
+    await Promise.all(updates.map(update => 
+      updateEventById(update.id, { status: update.status })
+    ));
+  }
+
+  return { updated: updates.length, details: updates };
 }
 
 /**
@@ -147,6 +201,33 @@ export async function findEventById(id: string): Promise<Event | undefined> {
   return result;
 }
 
+export async function findEventByOrderId(orderId: string): Promise<Event | undefined> {
+  const [result] = await db()
+    .select()
+    .from(event)
+    .where(eq(event.orderId, orderId));
+
+  return result;
+}
+
+/**
+ * 获取完整的活动详情（包含参与者列表）
+ * 注意：参与者列表分页暂未实现，目前返回全部（适用于小规模活动）
+ */
+export async function getEventWithDetails(eventId: string): Promise<{ event: Event; participants: any[] } | null> {
+  const eventData = await findEventById(eventId);
+  if (!eventData) return null;
+
+  // 动态导入避免循环依赖
+  const { getParticipantsByEventId } = await import('./participant');
+  const participants = await getParticipantsByEventId(eventId);
+
+  return {
+    event: eventData,
+    participants,
+  };
+}
+
 /**
  * 通过活动编号查找活动
  */
@@ -169,6 +250,21 @@ export async function updateEventById(
   const [result] = await db()
     .update(event)
     .set(updateData)
+    .where(eq(event.id, id))
+    .returning();
+
+  return result;
+}
+
+export async function incrementEventCapacity(
+  id: string,
+  incrementBy: number
+): Promise<Event | undefined> {
+  const [result] = await db()
+    .update(event)
+    .set({
+      capacity: sql`${event.capacity} + ${incrementBy}`,
+    })
     .where(eq(event.id, id))
     .returning();
 

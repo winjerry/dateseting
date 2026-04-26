@@ -1,13 +1,13 @@
 {
   "metadata": {
-    "title": "博客",
-    "description": "阅读我们最新的产品功能、解决方案和更新内容。"
+    "title": "DateSet 博客",
+    "description": "了解 DateSet 的最新动态和技术分享"
   },
   "blog": {
     "id": "blog",
-    "sr_only_title": "ShipAny 博客",
-    "title": "博客",
-    "description": "阅读我们最新的产品功能、解决方案和更新内容。"
+    "sr_only_title": "DateSet 博客",
+    "title": "DateSet 博客",
+    "description": "了解 DateSet 的最新动态和技术分享"
   },
   "page": {
     "all": "全部",

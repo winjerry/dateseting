@@ -22,6 +22,13 @@ const authOptions = {
   emailAndPassword: {
     enabled: true,
   },
+  session: {
+    expiresIn: 60 * 60 * 4, // 4 hours
+    updateAge: 60 * 60, // 1 hour
+    cookieCache: {
+      enabled: false,
+    },
+  },
   logger: {
     verboseLogging: false,
     // Disable all logs during build and production

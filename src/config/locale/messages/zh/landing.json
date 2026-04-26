@@ -84,11 +84,15 @@
     "show_theme": true,
     "show_locale": true
   },
+  "metadata": {
+    "title": "DateSet - Next.js 全栈开发模板",
+    "description": "基于 Next.js 15, React 19, TypeScript, Tailwind CSS 的全栈开发模板"
+  },
   "hero": {
-    "id": "hero",
-    "title": "一小时快速上线你的 AI 创业项目",
-    "highlight_text": "一小时",
-    "description": "ShipAny 是用于构建 AI SaaS 创业项目的 NextJS 项目模板。<br/>集成常用功能，快速上线你的产品。",
+    "title_1": "构建您的",
+    "title_2": "AI SaaS",
+    "title_3": "极速上线",
+    "description": "DateSet 是用于构建 AI SaaS 的终极 Next.js 样板代码，包含身份验证、支付、博客、后台管理等功能。",
     "announcement": {
       "badge": "全新",
       "title": "🎉 ShipAny 模板二已发布",
@@ -410,13 +414,13 @@
   },
   "faq": {
     "id": "faq",
-    "title": "关于 ShipAny 的常见问题",
-    "description": "还有其他问题？欢迎加入 Discord 或发邮件联系我们。",
+    "title": "常见问题",
+    "description": "关于 DateSet 的常见问题",
     "tip": "没有找到想要的答案？请联系 <a href='https://discord.gg/HQNnrzjZQS' target='_blank' class='text-primary font-medium hover:underline'>我们的客服团队</a>",
     "items": [
       {
-        "question": "ShipAny 是什么？怎么帮到我？",
-        "answer": "ShipAny 是专为 AI SaaS 创业设计的 NextJS 全套脚手架，内含开箱即用的模板、基础设施搭建和部署工具，让你数小时内上线 AI 产品。"
+        "question": "什么是 DateSet?",
+        "answer": "DateSet 是一个全栈 Next.js 样板代码，帮助开发者快速构建 AI SaaS 产品。"
       },
       {
         "question": "使用 ShipAny 需要很高的技术水平吗？",
