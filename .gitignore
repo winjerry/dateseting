@@ -63,3 +63,13 @@ src/config/db/migrations
 .source
 
 .chats
+
+# IDE / Editors
+.trae
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
