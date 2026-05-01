@@ -133,12 +133,12 @@ export default function RegistrationSuccessPage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Button
-                className="w-full gap-2"
+                className="w-full gap-2 whitespace-normal h-auto py-2 text-center"
                 disabled={!canStartMatching}
                 onClick={() => router.push(`/e/${eventNo}/choices`)}
               >
-                <Heart className="h-4 w-4" />
-                {canStartMatching ? 'Start Matching' : 'Matching opens after the event'}
+                <Heart className="h-4 w-4 shrink-0" />
+                <span>{canStartMatching ? 'Start Matching' : 'Opens after event'}</span>
               </Button>
               <Button variant="outline" className="w-full gap-2" onClick={handleAddToCalendar}>
                 <CalendarCheck className="h-4 w-4" />

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, location, eventDate, eventTime, eventEndTime, eventType, payment_provider, draftId } = body || {};
+    const { name, description, location, eventDate, eventTime, eventEndTime, eventType, payment_provider, draftId, choiceDeadline } = body || {};
 
     if (!name || !location || !eventDate || !eventTime || !eventType) {
       return respErr('invalid event draft');
@@ -80,14 +80,14 @@ export async function POST(request: NextRequest) {
       price: checkoutPrice,
       metadata: {
         order_no: orderNo,
-        event_draft: JSON.stringify({ name, description, location, eventDate, eventTime, eventEndTime, eventType }),
+        event_draft: JSON.stringify({ name, description, location, eventDate, eventTime, eventEndTime, eventType, choiceDeadline }),
       },
       successUrl: `${configs.app_url}/api/events/callback?order_no=${orderNo}`,
       cancelUrl: `${configs.app_url}/my-events/create`,
     };
 
     const currentTime = new Date();
-    const orderDescription = JSON.stringify({ name, description, location, eventDate, eventTime, eventEndTime, eventType });
+    const orderDescription = JSON.stringify({ name, description, location, eventDate, eventTime, eventEndTime, eventType, choiceDeadline });
 
     if (!isUpdate) {
       const newOrder: NewOrder = {

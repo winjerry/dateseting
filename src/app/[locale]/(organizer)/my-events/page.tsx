@@ -228,6 +228,8 @@ export default function MyEventsDashboard() {
                          <Button
                            variant="outline"
                            size="sm"
+                           disabled={event.status === 'completed' || event.status === 'cancelled' || event.status === 'matched'}
+                           title={event.status === 'completed' || event.status === 'cancelled' || event.status === 'matched' ? 'Cannot edit ended events' : undefined}
                            onClick={() => router.push(`/my-events/create?id=${event.id}`)}
                          >
                            <Edit className="h-4 w-4 mr-1" />

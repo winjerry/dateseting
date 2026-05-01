@@ -18,6 +18,7 @@ const updateEventSchema = z.object({
   eventEndTime: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
   capacity: z.number().int().positive().optional(),
   increaseCapacity: z.boolean().optional(),
+  choiceDeadline: z.string().optional().nullable(),
 });
 
 export async function GET(
@@ -47,6 +48,31 @@ export async function GET(
     // This resolves issues where the event table count is out of sync with the participant table
     if (result.participants) {
       result.event.currentParticipants = result.participants.length;
+    }
+
+    // 实时计算活动状态（修正 cron job 未及时更新的情况）
+    const evt = result.event;
+    if (evt.status !== 'cancelled' && evt.status !== 'draft' && evt.status !== 'matched') {
+      const now = new Date();
+      const dateStr = evt.eventDate instanceof Date 
+        ? evt.eventDate.toISOString().split('T')[0] 
+        : String(evt.eventDate).split('T')[0];
+      const eventStart = new Date(`${dateStr}T${evt.eventTime}`);
+      let eventEnd: Date;
+      if (evt.eventEndTime) {
+        eventEnd = new Date(`${dateStr}T${evt.eventEndTime}`);
+      } else {
+        eventEnd = new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
+      }
+
+      let newStatus = evt.status;
+      if (now > eventEnd) newStatus = 'completed';
+      else if (now >= eventStart && now <= eventEnd) newStatus = 'active';
+
+      if (newStatus !== evt.status) {
+        evt.status = newStatus;
+        updateEventById(evt.id, { status: newStatus }).catch(() => {});
+      }
     }
 
     return NextResponse.json({
@@ -85,6 +111,30 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // 实时计算活动状态，禁止编辑已结束或已取消的活动
+    let effectiveStatus = event.status;
+    if (event.status !== 'cancelled' && event.status !== 'draft' && event.status !== 'matched') {
+      const now = new Date();
+      const dateStr = event.eventDate instanceof Date 
+        ? event.eventDate.toISOString().split('T')[0] 
+        : String(event.eventDate).split('T')[0];
+      const eventStart = new Date(`${dateStr}T${event.eventTime}`);
+      let eventEnd: Date;
+      if (event.eventEndTime) {
+        eventEnd = new Date(`${dateStr}T${event.eventEndTime}`);
+      } else {
+        eventEnd = new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
+      }
+      if (now > eventEnd) effectiveStatus = 'completed';
+    }
+
+    if (effectiveStatus === 'completed' || effectiveStatus === 'cancelled' || effectiveStatus === 'matched') {
+      return NextResponse.json(
+        { error: 'Cannot edit a completed, matched, or cancelled event' },
+        { status: 400 }
+      );
+    }
+
     const body = await request.json();
     const validation = updateEventSchema.safeParse(body);
     if (!validation.success) {
@@ -94,7 +144,7 @@ export async function PATCH(
       );
     }
 
-    const { increaseCapacity, capacity, eventDate, ...rest } = validation.data;
+    const { increaseCapacity, capacity, eventDate, choiceDeadline, ...rest } = validation.data;
 
     let updatedEvent = event;
 
@@ -121,6 +171,7 @@ export async function PATCH(
     const updatePayload = {
       ...rest,
       ...(eventDate ? { eventDate: new Date(eventDate) } : {}),
+      ...(choiceDeadline ? { choiceDeadline: new Date(choiceDeadline) } : {}),
     };
 
     if (Object.keys(updatePayload).length > 0) {

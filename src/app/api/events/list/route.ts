@@ -80,6 +80,37 @@ export async function GET(request: NextRequest) {
       events = [...draftEvents, ...events];
     }
 
+    // 实时计算活动状态（修正 cron job 未及时更新的情况）
+    const { updateEventById } = await import('@/shared/models/event');
+    for (const evt of events) {
+      if (evt.isDraft || evt.status === 'cancelled' || evt.status === 'draft' || evt.status === 'matched') continue;
+      
+      const now = new Date();
+      const dateStr = evt.eventDate instanceof Date 
+        ? evt.eventDate.toISOString().split('T')[0] 
+        : String(evt.eventDate).split('T')[0];
+      const eventStart = new Date(`${dateStr}T${evt.eventTime}`);
+      let eventEnd: Date;
+      if (evt.eventEndTime) {
+        eventEnd = new Date(`${dateStr}T${evt.eventEndTime}`);
+      } else {
+        eventEnd = new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
+      }
+
+      let newStatus = evt.status;
+      if (now > eventEnd) {
+        newStatus = EventStatus.COMPLETED;
+      } else if (now >= eventStart && now <= eventEnd) {
+        newStatus = EventStatus.ACTIVE;
+      }
+
+      if (newStatus !== evt.status) {
+        evt.status = newStatus;
+        // 顺便更新数据库（lazy update）
+        updateEventById(evt.id, { status: newStatus }).catch(() => {});
+      }
+    }
+
     // 获取总数
     const total = await getEventsCount({
       organizerId: session.user.id,

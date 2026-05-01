@@ -95,6 +95,7 @@ export default function ConfirmEventDraftPage() {
           eventDate: draft.eventDate,
           eventTime: draft.eventTime,
           eventEndTime: draft.eventEndTime,
+          choiceDeadline: draft.choiceDeadline ? new Date(draft.choiceDeadline).toISOString() : undefined,
         }),
       });
       const data = await res.json();
@@ -176,7 +177,7 @@ export default function ConfirmEventDraftPage() {
             </div>
             <div>
               <div className="text-sm text-muted-foreground">Time</div>
-              <div className="font-medium">{draft.eventTime}</div>
+              <div className="font-medium">{draft.eventTime} (Local Time)</div>
             </div>
             <div>
               <div className="text-sm text-muted-foreground">Package</div>
@@ -186,21 +187,37 @@ export default function ConfirmEventDraftPage() {
               <div className="text-sm text-muted-foreground">Description</div>
               <div className="font-medium whitespace-pre-wrap">{draft.description || '-'}</div>
             </div>
+            {draft.choiceDeadline && (
+              <div className="col-span-2">
+                <div className="text-sm text-muted-foreground">Choice Deadline</div>
+                <div className="font-medium">{new Date(draft.choiceDeadline).toLocaleString()}</div>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center justify-between pt-4 border-t">
-            <div>
-              <div className="text-sm text-muted-foreground">Total</div>
-              <div className="text-lg font-semibold">${priceUSD} USD</div>
+          <div className="pt-6 border-t space-y-4">
+            <div className="text-xs text-muted-foreground text-center px-4">
+              By clicking "{draft.eventId ? 'Save Changes' : 'Proceed to Payment'}", you agree to our 
+              <Link href="/terms-of-service" className="underline mx-1 hover:text-primary">Terms of Service</Link>, 
+              <Link href="/privacy-policy" className="underline mx-1 hover:text-primary">Privacy Policy</Link> 
+              and 
+              <Link href="/refund-policy" className="underline mx-1 hover:text-primary">Refund Policy</Link>.
             </div>
-            <div className="flex gap-3">
-              <Button className="h-11 px-6" onClick={proceedPayment} disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {draft.eventId ? 'Save Changes' : 'Proceed to Payment'}
-              </Button>
-              <Link href={backLink}>
-                <Button variant="outline" className="h-11 px-6" disabled={loading}>Back to Edit</Button>
-              </Link>
+
+            <div className="flex items-center justify-between pt-2">
+              <div>
+                <div className="text-sm text-muted-foreground">Total</div>
+                <div className="text-lg font-semibold">${priceUSD} USD</div>
+              </div>
+              <div className="flex gap-3">
+                <Button className="h-11 px-6" onClick={proceedPayment} disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {draft.eventId ? 'Save Changes' : 'Proceed to Payment'}
+                </Button>
+                <Link href={backLink}>
+                  <Button variant="outline" className="h-11 px-6" disabled={loading}>Back to Edit</Button>
+                </Link>
+              </div>
             </div>
           </div>
         </CardContent>

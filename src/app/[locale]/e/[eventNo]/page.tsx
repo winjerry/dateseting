@@ -144,7 +144,16 @@ export default function PublicEventPage() {
 
             {/* CTA Button */}
             <div className="pt-2">
-              {event.isFull ? (
+              {event.status === 'completed' ? (
+                <Button 
+                  className="w-full h-14 text-lg font-semibold shadow-lg hover:shadow-xl transition-all" 
+                  size="lg"
+                  onClick={() => router.push(`/e/${eventNo}/login`)}
+                >
+                  <Heart className="h-5 w-5 mr-2" />
+                  Submit Your Choices
+                </Button>
+              ) : event.isFull ? (
                 <Button disabled className="w-full h-14 text-lg" size="lg">
                   Event Full
                 </Button>

@@ -3,6 +3,28 @@ import { z } from 'zod';
 import { findParticipantByToken, submitParticipantChoices, getParticipantsByEventId, getParticipantChoices } from '@/shared/models/participant';
 import { findEventById, EventStatus } from '@/shared/models/event';
 
+// 实时计算活动状态（不依赖 cron job）
+function getEffectiveEventStatus(event: any): string {
+  // matched 和 cancelled/draft 状态不参与实时计算
+  if (event.status === EventStatus.CANCELLED || event.status === EventStatus.DRAFT || event.status === EventStatus.MATCHED) {
+    return event.status;
+  }
+  const now = new Date();
+  const dateStr = event.eventDate instanceof Date 
+    ? event.eventDate.toISOString().split('T')[0] 
+    : String(event.eventDate).split('T')[0];
+  const eventStart = new Date(`${dateStr}T${event.eventTime}`);
+  let eventEnd: Date;
+  if (event.eventEndTime) {
+    eventEnd = new Date(`${dateStr}T${event.eventEndTime}`);
+  } else {
+    eventEnd = new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
+  }
+  if (now > eventEnd) return EventStatus.COMPLETED;
+  if (now >= eventStart && now <= eventEnd) return EventStatus.ACTIVE;
+  return event.status;
+}
+
 // 提交选择请求验证
 const choicesSchema = z.object({
   token: z.string().min(1, 'Token is required'),
@@ -57,7 +79,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (event.status !== EventStatus.COMPLETED) {
+    // 实时计算活动状态
+    const effectiveStatus = getEffectiveEventStatus(event);
+
+    // 已匹配的活动不允许再修改选择
+    if (effectiveStatus === EventStatus.MATCHED || event.status === EventStatus.MATCHED) {
+      return NextResponse.json(
+        { error: 'Choices are locked. Matching has already been completed.' },
+        { status: 400 }
+      );
+    }
+
+    // 检查选择截止时间
+    if (event.choiceDeadline && new Date() > new Date(event.choiceDeadline)) {
+      return NextResponse.json(
+        { error: 'The choice submission deadline has passed.' },
+        { status: 400 }
+      );
+    }
+
+    if (effectiveStatus !== EventStatus.COMPLETED) {
       return NextResponse.json(
         { error: 'Choices are only available after the event ends' },
         { status: 400 }
@@ -126,7 +167,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (event.status !== EventStatus.COMPLETED) {
+    // 实时计算活动状态
+    const effectiveStatus = getEffectiveEventStatus(event);
+    const isMatched = effectiveStatus === EventStatus.MATCHED || event.status === EventStatus.MATCHED;
+    const isDeadlinePassed = event.choiceDeadline ? new Date() > new Date(event.choiceDeadline) : false;
+    const isLocked = isMatched || isDeadlinePassed;
+
+    if (effectiveStatus !== EventStatus.COMPLETED && !isMatched) {
       return NextResponse.json(
         { error: 'Choices will open after the event ends' },
         { status: 400 }
@@ -141,6 +188,7 @@ export async function GET(request: NextRequest) {
         id: p.id,
         name: p.name,
         age: p.age,
+        gender: p.gender,
         interests: p.interests ? JSON.parse(p.interests) : [],
         photoUrl: p.photoUrl,
       }));
@@ -153,9 +201,18 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      currentUser: {
+        id: participant.id,
+        name: participant.name,
+        age: participant.age,
+        photoUrl: participant.photoUrl,
+      },
       hasSubmitted: participant.hasSubmittedChoices,
       participants: otherParticipants,
       choices: existingChoices,
+      isLocked,
+      choiceDeadline: event.choiceDeadline,
+      lockReason: isMatched ? 'matched' : isDeadlinePassed ? 'deadline' : null,
     });
   } catch (error) {
     console.error('Error getting participants for choices:', error);

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
-import { Users, Send, Clock, Sparkles, Heart, Loader2 } from 'lucide-react';
+import { Users, Send, Clock, Sparkles, Heart, Loader2, Lock, CalendarClock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Progress } from '@/shared/components/ui/progress';
 import { Badge } from '@/shared/components/ui/badge';
@@ -15,6 +15,8 @@ export default function LiveEventDashboard() {
   const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [timeElapsed, setTimeElapsed] = useState('00:00:00');
+  const [choiceCountdown, setChoiceCountdown] = useState('');
+  const [choiceLocked, setChoiceLocked] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch data
@@ -39,30 +41,95 @@ export default function LiveEventDashboard() {
     return () => clearInterval(interval);
   }, [eventNo]);
 
-  // Timer logic
+  // Choice Deadline 倒计时
   useEffect(() => {
-    if (!event) return;
+    if (!event?.choiceDeadline) return;
 
-    const updateTimer = () => {
+    const deadline = new Date(event.choiceDeadline);
+
+    const updateDeadlineCountdown = () => {
       const now = new Date();
-      const startTime = new Date(`${event.eventDate.split('T')[0]}T${event.eventTime}`);
-      
-      let diff = now.getTime() - startTime.getTime();
-      
-      // If not started yet
-      if (diff < 0) {
-        diff = Math.abs(diff);
-        // Show negative countdown? Or just "Starts in..."
-        // For simplicity, let's just show absolute time
+      const diff = deadline.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setChoiceCountdown('');
+        setChoiceLocked(true);
+        return;
       }
 
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-      setTimeElapsed(
-        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-      );
+      if (hours >= 24) {
+        const days = Math.floor(hours / 24);
+        const rh = hours % 24;
+        setChoiceCountdown(`${days}d ${rh}h ${minutes.toString().padStart(2, '0')}m`);
+      } else {
+        setChoiceCountdown(
+          `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+        );
+      }
+    };
+
+    // 如果活动已经是 matched 状态，直接锁定
+    if (event.status === 'matched') {
+      setChoiceLocked(true);
+      return;
+    }
+
+    const timer = setInterval(updateDeadlineCountdown, 1000);
+    updateDeadlineCountdown();
+    return () => clearInterval(timer);
+  }, [event]);
+
+  const [timerLabel, setTimerLabel] = useState('');
+  const [eventPhase, setEventPhase] = useState<'before' | 'live' | 'ended'>('before');
+
+  // Timer logic
+  useEffect(() => {
+    if (!event) return;
+
+    const startTime = new Date(`${event.eventDate.split('T')[0]}T${event.eventTime}`);
+    let endTime: Date;
+    if (event.eventEndTime) {
+      endTime = new Date(`${event.eventDate.split('T')[0]}T${event.eventEndTime}`);
+    } else {
+      endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000);
+    }
+
+    const formatDiff = (diff: number) => {
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    const updateTimer = () => {
+      const now = new Date();
+
+      if (now < startTime) {
+        // 活动还未开始 → 显示倒计时
+        setEventPhase('before');
+        setTimerLabel('Starts in');
+        setTimeElapsed(formatDiff(startTime.getTime() - now.getTime()));
+      } else if (now >= startTime && now <= endTime) {
+        // 活动进行中 → 显示已用时间
+        setEventPhase('live');
+        setTimerLabel('Time Elapsed');
+        setTimeElapsed(formatDiff(now.getTime() - startTime.getTime()));
+      } else {
+        // 活动已结束 → 停止计时，显示总时长
+        setEventPhase('ended');
+        setTimerLabel('Event Ended');
+        setTimeElapsed(formatDiff(endTime.getTime() - startTime.getTime()));
+        // 停止计时器
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        return;
+      }
     };
 
     timerRef.current = setInterval(updateTimer, 1000);
@@ -101,7 +168,7 @@ export default function LiveEventDashboard() {
         <header className="flex justify-between items-center mb-12">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
-              <Heart className="h-8 w-8 text-primary fill-primary animate-pulse" />
+              <Heart className={`h-8 w-8 text-primary fill-primary ${eventPhase === 'live' ? 'animate-pulse' : ''}`} />
             </div>
             <div>
               <h1 className="text-4xl font-bold tracking-tight">{event.name}</h1>
@@ -112,11 +179,24 @@ export default function LiveEventDashboard() {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-sm text-white/50 uppercase tracking-widest mb-1">Time Elapsed</div>
-            <div className="text-5xl font-mono font-bold text-primary tabular-nums mb-2">
+            <div className={`text-sm uppercase tracking-widest mb-1 ${
+              eventPhase === 'before' ? 'text-yellow-400' :
+              eventPhase === 'ended' ? 'text-red-400' : 'text-white/50'
+            }`}>
+              {timerLabel || 'Time Elapsed'}
+            </div>
+            <div className={`text-5xl font-mono font-bold tabular-nums mb-2 ${
+              eventPhase === 'before' ? 'text-yellow-400' :
+              eventPhase === 'ended' ? 'text-red-400' : 'text-primary'
+            }`}>
               {timeElapsed}
             </div>
-            {event.eventEndTime && (
+            {eventPhase === 'ended' ? (
+              <div className="flex items-center justify-end gap-2 text-red-400/80">
+                <Clock className="h-4 w-4" />
+                <span>Total duration</span>
+              </div>
+            ) : event.eventEndTime && (
               <div className="flex items-center justify-end gap-2 text-white/60">
                 <Clock className="h-4 w-4" />
                 <span>Ends at {event.eventEndTime}</span>
@@ -188,6 +268,49 @@ export default function LiveEventDashboard() {
                 </p>
               </CardContent>
             </Card>
+            {/* Choice Deadline Card — 活动结束后显示 */}
+            {(eventPhase === 'ended' || event.status === 'matched') && event.choiceDeadline && (
+              <Card className={`border backdrop-blur-xl ${
+                choiceLocked || event.status === 'matched'
+                  ? 'bg-red-500/10 border-red-500/30'
+                  : 'bg-amber-500/10 border-amber-500/30'
+              }`}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-2xl flex items-center gap-3">
+                    {choiceLocked || event.status === 'matched' ? (
+                      <Lock className="h-8 w-8 text-red-400" />
+                    ) : (
+                      <CalendarClock className="h-8 w-8 text-amber-400" />
+                    )}
+                    <span className={choiceLocked || event.status === 'matched' ? 'text-red-300' : 'text-amber-300'}>
+                      {event.status === 'matched' ? 'Choices Locked' : 'Choice Window'}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {event.status === 'matched' ? (
+                    <div className="flex items-center gap-3">
+                      <Lock className="h-6 w-6 text-red-400" />
+                      <span className="text-2xl text-red-300">Matching completed — selections locked</span>
+                    </div>
+                  ) : choiceLocked ? (
+                    <div className="flex items-center gap-3">
+                      <Lock className="h-6 w-6 text-red-400" />
+                      <span className="text-2xl text-red-300">Deadline passed — selections locked</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-6xl font-mono font-bold text-amber-300 tabular-nums mb-2">
+                        {choiceCountdown}
+                      </div>
+                      <p className="text-white/50 text-lg">
+                        Deadline: {new Date(event.choiceDeadline).toLocaleString()}
+                      </p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 

@@ -20,7 +20,7 @@ export type ConfigMap = Record<string, string>;
 
 export const envConfigs = {
   app_url: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
-  app_name: process.env.NEXT_PUBLIC_APP_NAME ?? 'Date, Set, Match',
+  app_name: process.env.NEXT_PUBLIC_APP_NAME ?? 'Pairivo',
   theme: process.env.NEXT_PUBLIC_THEME ?? 'default',
   appearance: process.env.NEXT_PUBLIC_APPEARANCE ?? 'system',
   locale: process.env.NEXT_PUBLIC_DEFAULT_LOCALE ?? 'en',
@@ -37,4 +37,5 @@ export const envConfigs = {
     process.env.SUPPORT_EMAIL ??
     process.env.NEXT_PUBLIC_SUPPORT_EMAIL ??
     'support@pairivo.com',
+  business_address: process.env.NEXT_PUBLIC_BUSINESS_ADDRESS ?? '',
 };

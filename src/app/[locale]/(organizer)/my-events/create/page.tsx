@@ -23,6 +23,7 @@ export default function CreateEventPage() {
     eventTime: '19:00',
     eventEndTime: '21:00',
     eventType: 'standard',
+    choiceDeadline: '', // ISO datetime-local string
   });
 
   useEffect(() => {
@@ -176,7 +177,24 @@ export default function CreateEventPage() {
   };
 
   const updateField = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      
+      // 当日期或结束时间变更时，自动计算默认截止时间（结束后48小时）
+      if ((field === 'eventDate' || field === 'eventEndTime') && !prev.choiceDeadline) {
+        const date = field === 'eventDate' ? value : prev.eventDate;
+        const endTime = field === 'eventEndTime' ? value : prev.eventEndTime;
+        if (date && endTime) {
+          const endDate = new Date(`${date}T${endTime}`);
+          endDate.setHours(endDate.getHours() + 48);
+          // Format as datetime-local value
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          next.choiceDeadline = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
+        }
+      }
+      
+      return next;
+    });
   };
 
   const isEditing = !!searchParams.get('id') || !!searchParams.get('draftId');
@@ -243,6 +261,19 @@ export default function CreateEventPage() {
                   className="h-11" 
                 />
               </div>
+            </div>
+
+            {/* Choice Deadline */}
+            <div className="space-y-2">
+              <Label htmlFor="choiceDeadline">Choice Deadline</Label>
+              <p className="text-xs text-muted-foreground">Participants must submit their choices before this time. Defaults to 48 hours after event ends.</p>
+              <Input 
+                id="choiceDeadline" 
+                type="datetime-local" 
+                value={formData.choiceDeadline} 
+                onChange={(e) => updateField('choiceDeadline', e.target.value)} 
+                className="h-11" 
+              />
             </div>
             <div className="space-y-3">
               <Label>Event Package *</Label>

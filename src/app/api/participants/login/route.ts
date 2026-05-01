@@ -47,9 +47,31 @@ export async function POST(request: NextRequest) {
     const refreshedParticipant = await refreshParticipantChoiceToken(participant.id);
     const activeParticipant = refreshedParticipant || participant;
 
+    // 实时计算活动状态（不依赖 cron job）
+    let effectiveStatus = event.status;
+    if (event.status !== 'cancelled' && event.status !== 'draft') {
+      const now = new Date();
+      const dateStr = event.eventDate instanceof Date 
+        ? event.eventDate.toISOString().split('T')[0] 
+        : String(event.eventDate).split('T')[0];
+      const eventStart = new Date(`${dateStr}T${event.eventTime}`);
+      let eventEnd: Date;
+      if (event.eventEndTime) {
+        eventEnd = new Date(`${dateStr}T${event.eventEndTime}`);
+      } else {
+        eventEnd = new Date(eventStart.getTime() + 2 * 60 * 60 * 1000);
+      }
+      if (now > eventEnd) {
+        effectiveStatus = 'completed';
+      } else if (now >= eventStart && now <= eventEnd) {
+        effectiveStatus = 'active';
+      }
+    }
+
     // 3. Return token
     return NextResponse.json({
       success: true,
+      eventStatus: effectiveStatus,
       participant: {
         id: activeParticipant.id,
         name: activeParticipant.name,

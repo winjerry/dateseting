@@ -100,10 +100,6 @@ export default function RegisterPage() {
       return;
     }
 
-    if (!uploadedPhotoUrl) {
-      toast.error('Please upload a selfie before registering');
-      return;
-    }
 
     setLoading(true);
 
@@ -197,7 +193,7 @@ export default function RegisterPage() {
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label>Selfie *</Label>
+                <Label>Selfie <span className="text-muted-foreground font-normal">(optional)</span></Label>
                 <ImageUploader
                   emptyHint="Upload one clear selfie"
                   title="Selfie"

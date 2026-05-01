@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Calendar, MapPin, Users, Clock, Heart, QrCode, Copy, Check, Mail, Settings, CheckCircle, ArrowLeft, Send, Download, Share2, Loader2, Tv } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, CalendarClock, Heart, QrCode, Copy, Check, Mail, Settings, CheckCircle, ArrowLeft, Send, Download, Share2, Loader2, Tv } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
@@ -105,11 +105,12 @@ export default function EventDetailPage() {
         
         if (data.success) {
             toast.success(`Found ${data.matchCount} matches!`);
-            // Refresh Data
+            // Refresh Data - 状态变为 matched
             setEvent({ 
               ...event, 
               isMatchingCompleted: true,
-              matchesCount: data.matchCount // Update count from API
+              status: 'matched',
+              matchesCount: data.matchCount
             });
         } else {
              toast.error(data.error || 'Failed to calculate matches');
@@ -223,6 +224,7 @@ export default function EventDetailPage() {
   const percentFull = event.capacity ? (event.currentParticipants / event.capacity) * 100 : 0;
   const shareLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/e/${event.eventNo}`;
   const submittedChoicesCount = participants.filter(p => p.hasSubmittedChoices).length;
+  const isEventEnded = event.status === 'completed' || event.status === 'cancelled';
 
   return (
     <div className="space-y-6">
@@ -233,8 +235,25 @@ export default function EventDetailPage() {
           <div className="flex items-center gap-3 mb-2"><h1 className="text-2xl font-bold">{event.name}</h1>{getStatusBadge(event.status)}</div>
           <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
             <span className="flex items-center gap-1"><Calendar className="h-4 w-4 text-primary" />{formatDate(event.eventDate)}</span>
-            <span className="flex items-center gap-1"><Clock className="h-4 w-4 text-primary" />{event.eventTime}</span>
+            <span className="flex items-center gap-1">
+              <Clock className="h-4 w-4 text-primary" />
+              {event.eventTime}{event.eventEndTime ? ` → ${event.eventEndTime}` : ''}
+            </span>
             <span className="flex items-center gap-1"><MapPin className="h-4 w-4 text-primary" />{event.location}</span>
+            {event.choiceDeadline && (
+              <span className={`flex items-center gap-1 ${
+                event.status === 'matched'
+                  ? 'text-green-600 dark:text-green-400'
+                  : new Date() > new Date(event.choiceDeadline)
+                    ? 'text-red-500 dark:text-red-400'
+                    : 'text-amber-600 dark:text-amber-400'
+              }`}>
+                <CalendarClock className="h-4 w-4" />
+                Choices until: {new Date(event.choiceDeadline).toLocaleString()}
+                {event.status === 'matched' && ' ✓'}
+                {event.status !== 'matched' && new Date() > new Date(event.choiceDeadline) && ' (expired)'}
+              </span>
+            )}
           </div>
         </div>
         <Button onClick={copyShareLink} className="gap-2">{copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}Share</Button>
@@ -251,7 +270,18 @@ export default function EventDetailPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Users className="h-4 w-4 text-blue-500" />Participants</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{event.currentParticipants}/{event.capacity}</div><Progress value={percentFull} className="mt-2 h-2" /></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Send className="h-4 w-4 text-green-500" />Choices Submitted</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{submittedChoicesCount}/{event.currentParticipants}</div><Progress value={event.currentParticipants ? (submittedChoicesCount / event.currentParticipants) * 100 : 0} className="mt-2 h-2" /></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Heart className="h-4 w-4 text-pink-500" />Matches</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{event.isMatchingCompleted ? (event.matchesCount || 0) : '-'}</div><Button size="sm" className="mt-2" onClick={calculateMatches} disabled={calculating}>{calculating ? 'Calculating...' : 'Calculate Matches'}</Button></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium flex items-center gap-2"><Heart className="h-4 w-4 text-pink-500" />Matches</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{event.isMatchingCompleted ? (event.matchesCount || 0) : '-'}</div>
+          {event.status === 'matched' ? (
+            <Badge className="mt-2 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Matched ✓</Badge>
+          ) : event.choiceDeadline && new Date() < new Date(event.choiceDeadline) ? (
+            <div className="mt-2">
+              <Button size="sm" disabled title="Wait for the choice deadline to pass">Calculate Matches</Button>
+              <p className="text-xs text-muted-foreground mt-1">Deadline: {new Date(event.choiceDeadline).toLocaleString()}</p>
+            </div>
+          ) : (
+            <Button size="sm" className="mt-2" onClick={calculateMatches} disabled={calculating}>{calculating ? 'Calculating...' : 'Calculate Matches'}</Button>
+          )}
+        </CardContent></Card>
       </div>
 
       <Tabs defaultValue="participants" className="space-y-4">
@@ -396,10 +426,16 @@ export default function EventDetailPage() {
         <TabsContent value="settings">
           <Card><CardHeader><CardTitle>Event Settings</CardTitle></CardHeader>
             <CardContent className="space-y-4">
+              {isEventEnded && (
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm">
+                  <Settings className="h-5 w-5 shrink-0" />
+                  <p>This event has ended. Settings are locked and cannot be modified.</p>
+                </div>
+              )}
               <div className="flex items-center justify-between p-4 border rounded-lg"><div><p className="font-medium">Status</p><p className="text-sm text-muted-foreground">Control registration</p></div>{getStatusBadge(event.status)}</div>
               <div className="flex items-center justify-between p-4 border rounded-lg"><div><p className="font-medium">Package</p><p className="text-sm text-muted-foreground">{event.eventType === 'standard' ? 'Standard - 100 people' : 'Large - 200 people'}</p></div><Badge variant="outline" className="capitalize">{event.eventType}</Badge></div>
-              <div className="flex items-center justify-between p-4 border rounded-lg"><div><p className="font-medium">Manage Capacity</p><p className="text-sm text-muted-foreground">Increase capacity by one package step</p></div><Button variant="outline" disabled={saving} onClick={handleIncreaseCapacity}>{saving ? 'Updating...' : `Increase by ${event.eventType === 'large' ? 200 : 100}`}</Button></div>
-              <div className="flex items-center justify-between p-4 border rounded-lg"><div><p className="font-medium">Edit Event</p><p className="text-sm text-muted-foreground">Update details without starting a new payment</p></div><Button variant="outline" onClick={() => router.push(`/my-events/create?id=${event.id}`)}>Edit Details</Button></div>
+              <div className={`flex items-center justify-between p-4 border rounded-lg ${isEventEnded ? 'opacity-50' : ''}`}><div><p className="font-medium">Manage Capacity</p><p className="text-sm text-muted-foreground">Increase capacity by one package step</p></div><Button variant="outline" disabled={saving || isEventEnded} onClick={handleIncreaseCapacity}>{saving ? 'Updating...' : `Increase by ${event.eventType === 'large' ? 200 : 100}`}</Button></div>
+              <div className={`flex items-center justify-between p-4 border rounded-lg ${isEventEnded ? 'opacity-50' : ''}`}><div><p className="font-medium">Edit Event</p><p className="text-sm text-muted-foreground">{isEventEnded ? 'Editing is disabled for ended events' : 'Update details without starting a new payment'}</p></div><Button variant="outline" disabled={isEventEnded} onClick={() => router.push(`/my-events/create?id=${event.id}`)}>Edit Details</Button></div>
               <div className="flex items-center justify-between p-4 border rounded-lg"><div><p className="font-medium">Support</p><p className="text-sm text-muted-foreground">{supportEmail}</p></div><Button variant="outline" onClick={() => window.location.href = `mailto:${supportEmail}`}>Contact Support</Button></div>
             </CardContent>
           </Card>

@@ -57,10 +57,8 @@ export function OrganizerLayout({ children }: OrganizerLayoutProps) {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Heart className="h-5 w-5 text-white fill-white" />
-              </div>
-              <span className="font-bold text-lg hidden sm:inline">Date, Set, Match</span>
+              <img src="/logo.png" alt="Pairivo Logo" className="w-9 h-9 object-contain" />
+              <span className="font-bold text-lg hidden sm:inline">Pairivo</span>
             </Link>
 
             {/* Center Nav */}
@@ -120,7 +118,7 @@ export function OrganizerLayout({ children }: OrganizerLayoutProps) {
       <footer className="border-t bg-background mt-auto">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <p className="text-center text-sm text-muted-foreground">
-            © 2024 Date, Set, Match. Organizer Portal.
+            © {new Date().getFullYear()} Pairivo. Organizer Portal.
           </p>
         </div>
       </footer>

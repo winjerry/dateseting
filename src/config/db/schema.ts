@@ -582,7 +582,10 @@ export const event = pgTable(
     isPaid: boolean('is_paid').default(false).notNull(),
 
     // 状态管理
-    status: text('status').notNull(), // 'draft' | 'paid' | 'active' | 'completed' | 'cancelled'
+    status: text('status').notNull(), // 'draft' | 'paid' | 'active' | 'completed' | 'matched' | 'cancelled'
+
+    // 选择截止时间（活动结束后，参与者需要在此时间前完成选择）
+    choiceDeadline: timestamp('choice_deadline'),
 
     // 匹配相关
     isMatchingCompleted: boolean('is_matching_completed').default(false).notNull(),

@@ -76,6 +76,7 @@ export async function GET(req: Request) {
             isPaid: true,
             orderId: order.id,
             shareLink: '',
+            choiceDeadline: draft.choiceDeadline ? new Date(draft.choiceDeadline) : undefined,
           });
 
           redirectUrl = `${envConfigs.app_url}/my-events/${createdEvent.id}`;

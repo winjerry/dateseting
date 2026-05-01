@@ -20,7 +20,8 @@ export enum EventStatus {
   DRAFT = 'draft',        // 草稿，待支付
   PAID = 'paid',          // 已支付，待激活
   ACTIVE = 'active',      // 活动进行中
-  COMPLETED = 'completed', // 活动已结束
+  COMPLETED = 'completed', // 活动已结束，选择窗口开放
+  MATCHED = 'matched',    // 已匹配，选择锁定
   CANCELLED = 'cancelled', // 已取消
 }
 

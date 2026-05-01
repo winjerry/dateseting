@@ -45,8 +45,13 @@ export default function ParticipantLoginPage() {
         localStorage.setItem(`participant_id_${eventNo}`, data.participant.id);
         
         toast.success('Welcome back!');
-        // Redirect to choices page (or success page)
-        router.push(`/e/${eventNo}/choices`);
+        
+        // Redirect to choices page if event is completed, otherwise to success page
+        if (data.eventStatus === 'completed') {
+          router.push(`/e/${eventNo}/choices`);
+        } else {
+          router.push(`/e/${eventNo}/success`);
+        }
       }
     } catch (error: any) {
       console.error(error);

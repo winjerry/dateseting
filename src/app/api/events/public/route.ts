@@ -28,10 +28,32 @@ export async function GET(request: NextRequest) {
     // 获取实时参与人数 (直接从 participant 表计数，保证准确性)
     const realTimeParticipantCount = await getParticipantsCount(event.id);
 
+    // 实时计算活动状态（不依赖 cron job）
+    let effectiveStatus = event.status;
+    if (event.status !== EventStatus.CANCELLED && event.status !== EventStatus.DRAFT && event.status !== EventStatus.MATCHED) {
+      const now = new Date();
+      const dateStr = event.eventDate instanceof Date 
+        ? event.eventDate.toISOString().split('T')[0] 
+        : String(event.eventDate).split('T')[0];
+      const eventStart = new Date(`${dateStr}T${event.eventTime}`);
+      let eventEnd: Date;
+      if (event.eventEndTime) {
+        eventEnd = new Date(`${dateStr}T${event.eventEndTime}`);
+      } else {
+        eventEnd = new Date(eventStart.getTime() + 2 * 60 * 60 * 1000); // 默认2小时
+      }
+
+      if (now > eventEnd) {
+        effectiveStatus = EventStatus.COMPLETED;
+      } else if (now >= eventStart && now <= eventEnd) {
+        effectiveStatus = EventStatus.ACTIVE;
+      }
+    }
+
     // 检查活动状态
     const isAcceptingRegistrations = 
-      event.status === EventStatus.ACTIVE || 
-      event.status === EventStatus.PAID;
+      effectiveStatus === EventStatus.ACTIVE || 
+      effectiveStatus === EventStatus.PAID;
 
     const isFull = realTimeParticipantCount >= event.capacity;
 
@@ -57,7 +79,8 @@ export async function GET(request: NextRequest) {
         capacity: event.capacity,
         currentParticipants: realTimeParticipantCount, // 使用实时计数
         submittedChoicesCount: stats.submittedChoices,
-        status: event.status,
+        status: effectiveStatus,
+        choiceDeadline: event.choiceDeadline,
         isAcceptingRegistrations,
         isFull,
       },
