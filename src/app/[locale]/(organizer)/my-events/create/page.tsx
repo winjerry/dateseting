@@ -63,6 +63,7 @@ export default function CreateEventPage() {
               eventTime: d.eventTime || '19:00',
               eventEndTime: d.eventEndTime || '21:00',
               eventType: d.eventType || 'standard',
+              choiceDeadline: d.choiceDeadline || '',
             });
           } else {
             toast.error('Draft data is empty or not found');
@@ -107,6 +108,7 @@ export default function CreateEventPage() {
             eventTime: e.eventTime || '19:00',
             eventEndTime: e.eventEndTime || '21:00',
             eventType: e.eventType || 'standard',
+            choiceDeadline: e.choiceDeadline || '',
           });
         }
       } finally {
